@@ -1,0 +1,3 @@
+numpy
+# Opcional: só para a opção "Ver gráfico do erro por época" do menu.
+matplotlib
