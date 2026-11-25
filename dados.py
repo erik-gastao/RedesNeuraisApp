@@ -256,6 +256,27 @@ def separar_treino_validacao_teste(X, Y, percentuais=(70, 15, 15), seed=None):
     Se a base tiver menos de 10 linhas (XOR, AND), não divide: os três
     conjuntos são a base inteira e `separou` vem False, para o main.py avisar.
     """
+    N = X.shape[0]
+    _, n_validacao, n_teste = tamanhos_da_divisao(N, percentuais)
+    if N < MINIMO_PARA_SEPARAR:
+        return X, Y, X, Y, X, Y, False
+
+    # Embaralha os índices das linhas (X e Y continuam alinhados).
+    indices = np.random.default_rng(seed).permutation(N)
+    teste = indices[:n_teste]
+    validacao = indices[n_teste:n_teste + n_validacao]
+    treino = indices[n_teste + n_validacao:]
+    return X[treino], Y[treino], X[validacao], Y[validacao], X[teste], Y[teste], True
+
+
+def tamanhos_da_divisao(N, percentuais):
+    """Quantas amostras vão para (treino, validação, teste).
+
+    Levanta ValueError com a explicação se os percentuais não servem: precisa
+    de 3 números, sem negativos, somando 100, treino > 0 e com pelo menos uma
+    amostra sobrando para o treino. Base com menos de 10 linhas não é
+    dividida: (N, 0, 0).
+    """
     percentuais = [float(p) for p in percentuais]
     if len(percentuais) != 3:
         raise ValueError("Informe 3 percentuais: treino, validação e teste.")
@@ -267,22 +288,74 @@ def separar_treino_validacao_teste(X, Y, percentuais=(70, 15, 15), seed=None):
         raise ValueError(f"Os percentuais precisam somar 100 (somam {sum(percentuais):g}).")
     if percentuais[0] == 0:
         raise ValueError("O treino precisa de mais de 0%.")
-
-    N = X.shape[0]
     if N < MINIMO_PARA_SEPARAR:
-        return X, Y, X, Y, X, Y, False
+        return N, 0, 0
 
     n_validacao = round(N * percentuais[1] / 100)
     n_teste = round(N * percentuais[2] / 100)
     if N - n_validacao - n_teste < 1:
         raise ValueError("Com esses percentuais não sobra nenhuma amostra para o treino.")
+    return N - n_validacao - n_teste, n_validacao, n_teste
 
-    # Embaralha os índices das linhas (X e Y continuam alinhados).
-    indices = np.random.default_rng(seed).permutation(N)
-    teste = indices[:n_teste]
-    validacao = indices[n_teste:n_teste + n_validacao]
-    treino = indices[n_teste + n_validacao:]
-    return X[treino], Y[treino], X[validacao], Y[validacao], X[teste], Y[teste], True
+
+def descrever_base(caminho):
+    """Resumo da base para escolher a rede antes de carregá-la (usado pelo hub).
+
+    Devolve {"amostras", "colunas", "cabecalho" (nomes ou None),
+    "classes" (nomes, se a última coluna é texto, ou None), "minimos",
+    "maximos" (de cada coluna numérica, na ordem)}.
+    Levanta FileNotFoundError ou ValueError como carregar_csv.
+    """
+    linhas = _ler_linhas(caminho)
+    cabecalho = None
+    if _e_cabecalho(linhas):
+        cabecalho = linhas[0][1]
+        linhas = linhas[1:]
+        if not linhas:
+            raise ValueError("O arquivo só tem o cabeçalho, sem linhas de dados.")
+
+    ultima_coluna = [campos[-1] for _, campos in linhas]
+    classes = None
+    if not all(_e_numero(valor) for valor in ultima_coluna):
+        classes = sorted(set(ultima_coluna))
+        tabela = np.array([_numeros(numero, campos[:-1]) for numero, campos in linhas])
+    else:
+        tabela = np.array([_numeros(numero, campos) for numero, campos in linhas])
+    return {
+        "amostras": len(linhas),
+        "colunas": len(linhas[0][1]),
+        "cabecalho": cabecalho,
+        "classes": classes,
+        "minimos": tabela.min(axis=0).tolist(),
+        "maximos": tabela.max(axis=0).tolist(),
+    }
+
+
+# Valores que cada ativação consegue produzir: (mínimo, máximo, texto).
+ALCANCE_DAS_ATIVACOES = {
+    "sigmoid": (0.0, 1.0, "entre 0 e 1"),
+    "tanh": (-1.0, 1.0, "entre -1 e 1"),
+    "relu": (0.0, np.inf, "maiores ou iguais a 0"),
+}
+
+
+def aviso_alcance(minimo, maximo, ativacao_saida):
+    """Texto de aviso se a saída esperada (de minimo a maximo) passa do que a
+    ativação da saída consegue produzir; None se não passa.
+
+    As saídas esperadas não são normalizadas, então uma sigmoid (0 a 1) nunca
+    chegaria em 2500 kg/ha, por exemplo. A linear não tem limite.
+    """
+    if ativacao_saida not in ALCANCE_DAS_ATIVACOES:
+        return None
+    limite_inferior, limite_superior, texto = ALCANCE_DAS_ATIVACOES[ativacao_saida]
+    if minimo >= limite_inferior and maximo <= limite_superior:
+        return None
+    return (
+        f"Atenção: a saída esperada vai de {minimo:g} a {maximo:g} e não é "
+        f"normalizada, mas a ativação {ativacao_saida} só produz valores {texto}. "
+        "Use a ativação linear na saída."
+    )
 
 
 def e_classificacao(Y, classes):

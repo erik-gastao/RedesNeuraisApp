@@ -1,3 +1,7 @@
 numpy
 # Opcional: só para a opção "Ver gráfico do erro por época" do menu.
 matplotlib
+# Interface gráfica (python interface_grafica.py).
+pygame-ce
+pygame_gui
+Pillow

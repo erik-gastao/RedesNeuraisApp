@@ -15,7 +15,7 @@ from pathlib import Path
 
 import numpy as np
 
-from dados import carregar_csv, listar_bases
+from dados import aviso_alcance, carregar_csv, listar_bases
 from experimento import PERCENTUAIS_PADRAO, Experimento, nome_da_classe
 from graficos import grafico_do_erro
 from rede.ativacoes import ATIVACOES
@@ -233,29 +233,11 @@ def carregar_base(rede):
         return X, Y, classes, Path(caminho).name
 
 
-# Valores que cada ativação consegue produzir: (mínimo, máximo, texto).
-ALCANCE_DAS_ATIVACOES = {
-    "sigmoid": (0.0, 1.0, "entre 0 e 1"),
-    "tanh": (-1.0, 1.0, "entre -1 e 1"),
-    "relu": (0.0, np.inf, "maiores ou iguais a 0"),
-}
-
-
 def avisar_alcance_da_saida(Y, ativacao_saida):
-    """Avisa se a saída esperada passa do que a ativação da saída consegue produzir.
-
-    As saídas esperadas não são normalizadas, então uma sigmoid (0 a 1) nunca
-    chegaria em 2500 kg/ha, por exemplo. A linear não tem limite.
-    """
-    if ativacao_saida not in ALCANCE_DAS_ATIVACOES:
-        return
-    minimo, maximo, texto = ALCANCE_DAS_ATIVACOES[ativacao_saida]
-    if Y.min() < minimo or Y.max() > maximo:
-        print(
-            f"  Atenção: a saída esperada vai de {Y.min():g} a {Y.max():g} e não é "
-            f"normalizada, mas a ativação {ativacao_saida} só produz valores {texto}. "
-            "Use a ativação linear na saída."
-        )
+    """Avisa se a saída esperada passa do que a ativação da saída consegue produzir."""
+    aviso = aviso_alcance(Y.min(), Y.max(), ativacao_saida)
+    if aviso:
+        print(f"  {aviso}")
 
 
 def perguntar_divisao(experimento):

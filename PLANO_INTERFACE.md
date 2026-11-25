@@ -475,6 +475,7 @@ def passos_previsao(rede, x_normalizado, nivel) -> list[Passo]
 | 2 | `passos.py`, `formulas.py`, `gravador.py` + `test_gravador.py` | valores gravados batem com `z`/`a`/`δ` reais; treino gravado = `treinamento.treinar` com a mesma semente |
 | 3 | `layout_rede.py` + `test_layout_rede.py` | posições, cores (inclusive linear), espessuras, "⋮" testados |
 | 4 | `app.py` + hub (pygame_gui) + rede estática | escolher Iris, montar 4 → 5 → 3, ver a rede com pesos iniciais; divisão/normalização/ativação da saída validadas no hub |
+| 4 ✓ | Feito: `config_hub.py` (validação sem pygame), `tela_hub.py`, `tela_rede.py` (rede parada), `desenho_rede.py`, `app.py`, `test_interface.py` (fumaça). Também `dados.descrever_base`, `tamanhos_da_divisao` e `aviso_alcance` (compartilhados com o terminal). O pygame_gui usa a Segoe UI do sistema (tem →, ●, η); sem ela, a Noto Sans. `pygame-ce` 2.5.8 e `pygame_gui` 0.6.14 funcionam no Python 3.14. | — |
 | 5 | Player: barra de tempo, ◀ ▶, ▶/⏸, velocidade, atalhos | navegar para frente e para trás em XOR sem erro |
 | 6 | Forward animado + painel de fórmulas | ver cada `w·a`, soma, bias, ativação com números certos |
 | 7 | Erro, retropropagação (visão gradiente), ajuste e exemplos compactos | ver `δ` nascendo na saída e voltando; ajuste muda espessuras a cada exemplo |

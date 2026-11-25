@@ -17,8 +17,9 @@ Configurável de Redes Neurais Artificiais (MLP)").
    pip install -r requirements.txt
    ```
 
-   Isso instala o NumPy (cálculos da rede) e o matplotlib (só para o gráfico
-   do erro, opcional).
+   Isso instala o NumPy (cálculos da rede), o matplotlib (só para o gráfico
+   do erro, opcional) e o pygame-ce, o pygame_gui e o Pillow (interface
+   gráfica).
 
 ## Rodar
 
@@ -36,6 +37,13 @@ aprendizado e o número de épocas. Depois treina, mostra o erro de treino e de
 validação a cada época e avalia o resultado no conjunto de teste. Valor
 digitado errado não quebra o programa: ele explica o problema e pergunta de
 novo.
+
+### Interface gráfica (em construção)
+
+Com dois cliques em `executar_interface.bat`, ou `python interface_grafica.py`.
+Por enquanto o hub monta a rede (base, camadas, ativações, divisão,
+normalização) e mostra a rede com os pesos iniciais; o player passo a passo
+está sendo construído (ver `PLANO_INTERFACE.md`).
 
 Respondendo `n` em "Quer criar uma rede neural?", o programa oferece
 **carregar uma rede salva** (`.json`) para fazer previsões.
@@ -301,7 +309,13 @@ RedesNeuraisApp/
 ├── dados.py             # carregar CSV, normalizar, dividir treino/validação/teste, acurácia
 ├── persistencia.py      # salvar e carregar a rede em JSON
 ├── graficos.py          # gráfico do erro por época (matplotlib, opcional)
+├── interface_grafica.py # abre a interface gráfica (pygame)
 ├── interface/           # interface gráfica (em construção; ver PLANO_INTERFACE.md)
+│   ├── app.py           # janela, telas e eventos
+│   ├── tela_hub.py      # hub: escolher a base e montar a rede
+│   ├── config_hub.py    # validação do formulário do hub
+│   ├── tela_rede.py     # rede desenhada (vira o player)
+│   ├── desenho_rede.py  # desenha a rede com pygame
 │   ├── passos.py        # Passo da animação e estado_em()
 │   ├── formulas.py      # textos das fórmulas com números
 │   ├── gravador.py      # grava o treino SGD em passos
@@ -323,9 +337,12 @@ RedesNeuraisApp/
 │   ├── test_experimento.py  # fluxo completo sem terminal
 │   ├── test_gravador.py     # passos do player batem com a rede real
 │   ├── test_layout_rede.py  # posições, cores e espessuras
+│   ├── test_config_hub.py   # validação do hub
+│   ├── test_interface.py    # fumaça da interface (sem janela)
 │   ├── test_main.py         # programa inteiro com respostas simuladas
 │   └── test_graficos.py     # gráfico do erro
 ├── executar.bat         # abre o programa com dois cliques (Windows)
+├── executar_interface.bat # abre a interface gráfica com dois cliques
 ├── testar.bat           # roda os testes com dois cliques (Windows)
 ├── requirements.txt
 ├── PLANO.md             # especificação original do projeto
@@ -340,7 +357,7 @@ Com dois cliques em `testar.bat`, ou pelo terminal nesta pasta:
 python -m unittest discover testes
 ```
 
-São 232 testes e levam cerca de 40 segundos. Os mais importantes:
+São 263 testes e levam cerca de 40 segundos. Os mais importantes:
 
 - `TesteGradiente` (`testes/test_rede.py`): para cada peso de cada
   neurônio, compara o gradiente da retropropagação (`δ · x`) com

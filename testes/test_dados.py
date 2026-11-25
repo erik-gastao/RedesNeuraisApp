@@ -16,8 +16,11 @@ from dados import (
     listar_bases,
     normalizar,
     normalizar_por_lotes,
+    aviso_alcance,
+    descrever_base,
     e_classificacao,
     separar_treino_validacao_teste,
+    tamanhos_da_divisao,
 )
 
 PASTA_BASES = Path(__file__).resolve().parent.parent / "bases"
@@ -304,6 +307,64 @@ class TesteSepararTresConjuntos(unittest.TestCase):
             np.testing.assert_array_equal(parte, X)
         for parte in (Y_tr, Y_va, Y_te):
             np.testing.assert_array_equal(parte, Y)
+
+
+class TesteTamanhosDaDivisao(unittest.TestCase):
+
+    def test_dataset_do_professor(self):
+        self.assertEqual(tamanhos_da_divisao(179, (70, 15, 15)), (125, 27, 27))
+
+    def test_base_pequena_nao_divide(self):
+        self.assertEqual(tamanhos_da_divisao(4, (70, 15, 15)), (4, 0, 0))
+
+    def test_percentuais_invalidos_dao_valueerror(self):
+        for percentuais in [(70, 30), (70, 20, 20), (110, -5, -5), (0, 50, 50)]:
+            with self.assertRaises(ValueError, msg=percentuais):
+                tamanhos_da_divisao(100, percentuais)
+
+
+class TesteDescreverBase(unittest.TestCase):
+    """Resumo da base para o hub, sem saber ainda quantas são as saídas."""
+
+    def test_xor(self):
+        d = descrever_base(PASTA_BASES / "xor.csv")
+        self.assertEqual((d["amostras"], d["colunas"]), (4, 3))
+        self.assertEqual(d["cabecalho"], ["x1", "x2", "y"])
+        self.assertIsNone(d["classes"])
+        self.assertEqual(d["minimos"], [0.0, 0.0, 0.0])
+        self.assertEqual(d["maximos"], [1.0, 1.0, 1.0])
+
+    def test_iris_tem_classes_em_texto(self):
+        d = descrever_base(PASTA_DATASET / "bezdekIris.data")
+        self.assertEqual((d["amostras"], d["colunas"]), (150, 5))
+        self.assertIsNone(d["cabecalho"])
+        self.assertEqual(d["classes"], ["Iris-setosa", "Iris-versicolor", "Iris-virginica"])
+        self.assertEqual(len(d["minimos"]), 4)   # só as colunas numéricas
+
+    def test_dataset_do_professor(self):
+        d = descrever_base(PASTA_DATASET / "dataset.csv")
+        self.assertEqual(d["cabecalho"], ["sementes_m2", "nitrogenio_kg_ha", "produtividade_kg_ha"])
+        self.assertEqual(d["maximos"][2], 3160.4)
+
+    def test_arquivo_inexistente(self):
+        with self.assertRaises(FileNotFoundError):
+            descrever_base(PASTA_BASES / "nao_existe.csv")
+
+
+class TesteAvisoAlcance(unittest.TestCase):
+
+    def test_saida_fora_do_alcance_da_sigmoid(self):
+        aviso = aviso_alcance(100.137, 149.861, "sigmoid")
+        self.assertIn("vai de 100.137 a 149.861", aviso)
+        self.assertIn("só produz valores entre 0 e 1. Use a ativação linear na saída.", aviso)
+
+    def test_dentro_do_alcance_ou_linear_nao_avisa(self):
+        self.assertIsNone(aviso_alcance(0.2, 0.8, "sigmoid"))
+        self.assertIsNone(aviso_alcance(-0.9, 0.9, "tanh"))
+        self.assertIsNone(aviso_alcance(-5000, 5000, "linear"))
+
+    def test_relu_com_negativo_avisa(self):
+        self.assertIn("maiores ou iguais a 0", aviso_alcance(-5, 1, "relu"))
 
 
 class TesteTipoDeProblema(unittest.TestCase):
