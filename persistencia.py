@@ -73,6 +73,8 @@ def carregar_rede(caminho):
         raise FileNotFoundError(f"Arquivo não encontrado: {caminho}") from None
     except (IsADirectoryError, PermissionError):
         raise ValueError(f"Não foi possível ler o arquivo: {caminho}") from None
+    except UnicodeDecodeError:
+        raise ValueError(f"O arquivo não é um arquivo de texto (JSON): {caminho}") from None
     try:
         dados = json.loads(texto)
     except json.JSONDecodeError:
@@ -90,8 +92,13 @@ def carregar_rede(caminho):
 def _reconstruir(dados):
     """Monta a RedeNeural com a arquitetura do arquivo e copia pesos e vieses."""
     camadas = dados["camadas"]
-    if not camadas:
-        raise ValueError("O arquivo não tem nenhuma camada.")
+    if not isinstance(camadas, list) or not camadas:
+        raise ValueError("O campo 'camadas' precisa ser uma lista com pelo menos uma camada.")
+    if not _inteiro_positivo(dados["n_entradas"]):
+        raise ValueError("A rede precisa de pelo menos 1 entrada (campo 'n_entradas').")
+    for numero, camada in enumerate(camadas, start=1):
+        if not _inteiro_positivo(camada["neuronios"]):
+            raise ValueError(f"Camada {numero}: precisa de pelo menos 1 neurônio.")
     ocultas = [(c["neuronios"], c["ativacao"]) for c in camadas[:-1]]
     saida = camadas[-1]
     rede = RedeNeural(
@@ -113,7 +120,36 @@ def _reconstruir(dados):
             neuronio.pesos = w.copy()
             neuronio.bias = float(b)
 
-    return rede, dados.get("normalizacao"), dados.get("classes")
+    normalizacao = dados.get("normalizacao")
+    _conferir_normalizacao(normalizacao, rede.n_entradas)
+    classes = dados.get("classes")
+    if classes is not None and (not isinstance(classes, list) or len(classes) != rede.n_saidas):
+        raise ValueError(
+            f"O campo 'classes' precisa ter um nome por neurônio de saída ({rede.n_saidas})."
+        )
+    return rede, normalizacao, classes
+
+
+def _inteiro_positivo(valor):
+    return isinstance(valor, int) and not isinstance(valor, bool) and valor >= 1
+
+
+def _conferir_normalizacao(normalizacao, n_entradas):
+    """A normalização salva precisa ser min-max com um mínimo e um máximo por entrada."""
+    if normalizacao is None:
+        return
+    if not isinstance(normalizacao, dict):
+        raise ValueError("O campo 'normalizacao' precisa ser um objeto ou null.")
+    funcao = normalizacao.get("funcao")
+    if funcao != "min-max":
+        raise ValueError(f"Normalização desconhecida: '{funcao}' (o programa usa só min-max).")
+    for chave in ("minimos", "maximos"):
+        valores = normalizacao.get(chave)
+        if not isinstance(valores, list) or len(valores) != n_entradas:
+            raise ValueError(
+                f"A normalização precisa de '{chave}' com um valor para cada uma "
+                f"das {n_entradas} entradas."
+            )
 
 
 def _normalizacao_para_json(normalizacao):

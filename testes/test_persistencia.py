@@ -101,6 +101,60 @@ class TestePersistencia(unittest.TestCase):
         with self.assertRaises(ValueError):
             carregar_rede(self.caminho)
 
+    def gravar_alterado(self, alterar, normalizacao=None, classes=None):
+        """Salva a rede, aplica `alterar` ao dicionário do JSON e regrava."""
+        salvar_rede(self.caminho, self.rede, normalizacao, classes)
+        dados = json.loads(self.caminho.read_text(encoding="utf-8"))
+        alterar(dados)
+        self.caminho.write_text(json.dumps(dados), encoding="utf-8")
+
+    def assertArquivoInvalido(self, *trechos):
+        with self.assertRaises(ValueError) as erro:
+            carregar_rede(self.caminho)
+        for trecho in trechos:
+            self.assertIn(trecho, str(erro.exception))
+
+    NORMALIZACAO = {"funcao": "min-max", "minimos": [0.0, 0.0, 0.0], "maximos": [1.0, 1.0, 1.0]}
+
+    def test_normalizacao_sem_minimos_da_valueerror(self):
+        self.gravar_alterado(lambda d: d["normalizacao"].pop("minimos"), self.NORMALIZACAO)
+        self.assertArquivoInvalido("normaliza")
+
+    def test_normalizacao_com_tamanho_errado_da_valueerror(self):
+        def alterar(d):
+            d["normalizacao"]["minimos"] = [5.0]
+            d["normalizacao"]["maximos"] = [10.0]
+        self.gravar_alterado(alterar, self.NORMALIZACAO)
+        self.assertArquivoInvalido("normaliza", "3")
+
+    def test_normalizacao_com_funcao_desconhecida_da_valueerror(self):
+        self.gravar_alterado(lambda d: d["normalizacao"].update(funcao="z-score"), self.NORMALIZACAO)
+        self.assertArquivoInvalido("z-score")
+
+    def test_classes_com_tamanho_errado_da_valueerror(self):
+        self.gravar_alterado(lambda d: d.update(classes=["a"]), classes=["a", "b"])
+        self.assertArquivoInvalido("classes")
+
+    def test_n_entradas_zero_da_valueerror(self):
+        self.gravar_alterado(lambda d: d.update(n_entradas=0))
+        self.assertArquivoInvalido("entradas")
+
+    def test_camada_sem_neuronios_da_valueerror(self):
+        self.gravar_alterado(lambda d: d["camadas"][0].update(neuronios=0))
+        self.assertArquivoInvalido("neurônio")
+
+    def test_camadas_que_nao_sao_lista_da_valueerror(self):
+        self.gravar_alterado(lambda d: d.update(camadas=5))
+        with self.assertRaises(ValueError) as erro:
+            carregar_rede(self.caminho)
+        self.assertNotIn("slice", str(erro.exception))
+        self.assertIn("camadas", str(erro.exception))
+
+    def test_arquivo_binario_da_valueerror_em_portugues(self):
+        self.caminho.parent.mkdir(parents=True)
+        self.caminho.write_bytes(b"\xff\xfe\x00\x81binario")
+        self.assertArquivoInvalido("não é um arquivo de texto")
+
     def test_pesos_com_forma_errada_da_valueerror(self):
         salvar_rede(self.caminho, self.rede)
         dados = json.loads(self.caminho.read_text(encoding="utf-8"))

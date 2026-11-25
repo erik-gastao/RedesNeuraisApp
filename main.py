@@ -240,19 +240,41 @@ def carregar_base(rede):
         print(f"  Base carregada: {X.shape[0]} amostras.")
         if classes is not None:
             print(f"  Classes (uma por neurônio de saída): {', '.join(classes)}")
-        if not e_classificacao(Y, classes) and rede.ativacao_saida not in ("linear", "relu"):
-            print(
-                "  Atenção: a saída esperada não fica entre 0 e 1 e não será "
-                "normalizada. Use a ativação linear na saída."
-            )
+        avisar_alcance_da_saida(Y, rede.ativacao_saida)
         return X, Y, classes, Path(caminho).name
+
+
+# Valores que cada ativação consegue produzir: (mínimo, máximo, texto).
+ALCANCE_DAS_ATIVACOES = {
+    "sigmoid": (0.0, 1.0, "entre 0 e 1"),
+    "tanh": (-1.0, 1.0, "entre -1 e 1"),
+    "relu": (0.0, np.inf, "maiores ou iguais a 0"),
+}
+
+
+def avisar_alcance_da_saida(Y, ativacao_saida):
+    """Avisa se a saída esperada passa do que a ativação da saída consegue produzir.
+
+    As saídas esperadas não são normalizadas, então uma sigmoid (0 a 1) nunca
+    chegaria em 2500 kg/ha, por exemplo. A linear não tem limite.
+    """
+    if ativacao_saida not in ALCANCE_DAS_ATIVACOES:
+        return
+    minimo, maximo, texto = ALCANCE_DAS_ATIVACOES[ativacao_saida]
+    if Y.min() < minimo or Y.max() > maximo:
+        print(
+            f"  Atenção: a saída esperada vai de {Y.min():g} a {Y.max():g} e não é "
+            f"normalizada, mas a ativação {ativacao_saida} só produz valores {texto}. "
+            "Use a ativação linear na saída."
+        )
 
 
 def perguntar_divisao(X, Y, semente):
     """Pergunta os percentuais e divide em treino, validação e teste.
 
-    Aceita "70/15/15", "70 15 15" ou "70,15,15". Repete até a divisão ser
-    válida (3 números, sem negativos, somando 100, treino > 0).
+    Aceita "70/15/15", "70 15 15" ou "70,15,15". Com "/", ";" ou espaços
+    separando, a vírgula vale como decimal ("70,5/14,5/15"). Repete até a
+    divisão ser válida (3 números, sem negativos, somando 100, treino > 0).
     """
     padrao = "/".join(str(p) for p in PERCENTUAIS_PADRAO)
     while True:
@@ -260,8 +282,12 @@ def perguntar_divisao(X, Y, semente):
         if texto == "":
             percentuais = PERCENTUAIS_PADRAO
         else:
+            if re.search(r"[/;\s]", texto):
+                partes = re.split(r"[/;\s]+", texto.replace(",", "."))
+            else:
+                partes = texto.split(",")
             try:
-                percentuais = [float(parte) for parte in re.split(r"[/\s,;]+", texto)]
+                percentuais = [float(parte) for parte in partes]
             except ValueError:
                 print("  Valor inválido: digite 3 números somando 100 (ex.: 70/15/15).")
                 continue
@@ -275,13 +301,14 @@ def perguntar_lotes(X_treino_original, X_treino):
     """Pergunta se as entradas do treino devem ser normalizadas por lotes.
 
     Enter mantém a normalização da base de treino inteira (X_treino, já
-    pronto). Com um tamanho menor, cada lote de registros é normalizado com
-    o mínimo e o máximo dele mesmo (ver dados.normalizar_por_lotes).
+    pronto), que é o padrão do enunciado. Com um tamanho menor, cada lote de
+    registros é normalizado com o mínimo e o máximo dele mesmo (ver
+    dados.normalizar_por_lotes) — opção extra deste projeto.
     Devolve o X do treino que a rede vai usar.
     """
     N = len(X_treino_original)
     tamanho = perguntar_inteiro(
-        f"Tamanho do lote para normalizar (2 a {N}, Enter = base inteira): ",
+        f"Tamanho do lote para normalizar (2 a {N}, Enter = treino inteiro, o padrão): ",
         2, padrao=N, maximo=N,
     )
     if tamanho == N:
@@ -292,6 +319,10 @@ def perguntar_lotes(X_treino_original, X_treino):
         f"  Entradas do treino normalizadas em {n_lotes} lote(s) de "
         f"~{tamanho} registros, cada um com sua própria escala. A validação, "
         "o teste e as entradas digitadas usam a escala do treino inteiro."
+    )
+    print(
+        "  Atenção: isso foge do padrão do enunciado (uma escala só, calculada "
+        "no treino e aplicada aos três conjuntos)."
     )
     return normalizar_por_lotes(X_treino_original, tamanho)
 
@@ -554,11 +585,14 @@ def sessao_da_rede():
 
 
 def sessao_rede_salva():
-    """Carrega uma rede de um arquivo .json e permite fazer previsões."""
+    """Carrega uma rede de um arquivo .json e permite fazer previsões.
+
+    Devolve True se o usuário cancelou (volta ao início), False para sair.
+    """
     while True:
-        texto = input("Arquivo da rede (.json) (Enter = cancelar): ").strip().strip('"')
+        texto = input("Arquivo da rede (.json) (Enter = voltar ao início): ").strip().strip('"')
         if texto == "":
-            return
+            return True
         try:
             rede, normalizacao, classes = carregar_rede(texto)
         except (OSError, ValueError) as erro:
@@ -580,7 +614,7 @@ def sessao_rede_salva():
         print("  1) Testar uma entrada digitada")
         print("  0) Sair")
         if perguntar_opcao("Opção: ", ["1", "0"]) == "0":
-            return
+            return False
         testar_entrada_digitada(rede, normalizacao, classes, mostrar_classe)
 
 
@@ -592,12 +626,18 @@ def main():
 
     print("=== Construtor de Redes Neurais ===")
     try:
-        if perguntar_sn("Quer criar uma rede neural? (s/n) "):
-            while sessao_da_rede():
-                print()
-                print("--- Nova rede ---")
-        elif perguntar_sn("Quer carregar uma rede salva? (s/n) "):
-            sessao_rede_salva()
+        while True:
+            if perguntar_sn("Quer criar uma rede neural? (s/n) "):
+                while sessao_da_rede():
+                    print()
+                    print("--- Nova rede ---")
+                break
+            if not perguntar_sn("Quer carregar uma rede salva? (s/n) "):
+                break
+            # Enter no nome do arquivo volta para a primeira pergunta.
+            if not sessao_rede_salva():
+                break
+            print()
     except (EOFError, KeyboardInterrupt):
         # Ctrl+C ou fim da entrada: sai sem mostrar traceback.
         print()

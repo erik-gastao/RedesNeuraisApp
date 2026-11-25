@@ -130,7 +130,8 @@ class RedeNeural:
                 if camada.nome_ativacao == "sigmoid":
                     ativacao = f"sigmoid no treino / {regra} na classificação"
                 else:
-                    ativacao = f"{camada.nome_ativacao} — {regra} na classificação"
+                    # Ex.: linear na regressão — ŷ já é a resposta, sem classe.
+                    ativacao = camada.nome_ativacao
             else:
                 titulo = f"Oculta {i + 1}"
                 ativacao = camada.nome_ativacao

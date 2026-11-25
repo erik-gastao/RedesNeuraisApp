@@ -174,7 +174,8 @@ O que o programa faz com a base:
 
 - **Divide em treino, validação e teste** quando a base tem 10 linhas ou
   mais. Pergunta os percentuais (Enter = `70/15/15`; aceita `70/15/15`,
-  `70 15 15` ou `70,15,15`; precisam somar 100) e embaralha com a semente
+  `70 15 15` ou `70,15,15`; com `/` a vírgula vale como decimal, como em
+  `70,5/14,5/15`; precisam somar 100) e embaralha com a semente
   escolhida. O treino ajusta os pesos; a validação só mede o erro a cada
   época; o teste fica reservado para a avaliação final. Com menos de 10
   linhas (XOR, AND), treina e avalia na base inteira, sem validação, e avisa.
@@ -185,8 +186,9 @@ O que o programa faz com a base:
 - **Normalização por lotes (opcional):** se normalizou e a base foi
   dividida, o programa pergunta o tamanho do lote. Com Enter, usa o treino
   inteiro; com um número menor, cada lote de registros do treino é
-  normalizado com o mínimo e o máximo dele mesmo. Lotes muito pequenos
-  pioram o resultado.
+  normalizado com o mínimo e o máximo dele mesmo. É uma opção extra deste
+  projeto e foge do padrão do enunciado (uma escala só, do treino, para os
+  três conjuntos); o programa avisa. Lotes muito pequenos pioram o resultado.
 
 ### Classe em texto (Iris)
 
@@ -229,7 +231,8 @@ erros de digitação da primeira (linhas 35 e 38). Prefira a `bezdekIris.data`.
 
 A opção 5 do menu grava a rede num arquivo JSON. Para usar depois: rode o
 programa, responda `n` em "Quer criar uma rede neural?", `s` em "Quer
-carregar uma rede salva?" e informe o arquivo. A rede carregada dá
+carregar uma rede salva?" e informe o arquivo (Enter volta à primeira
+pergunta). A rede carregada dá
 exatamente as mesmas saídas da original e aplica sozinha a normalização
 salva às entradas digitadas.
 
@@ -328,7 +331,7 @@ Com dois cliques em `testar.bat`, ou pelo terminal nesta pasta:
 python -m unittest discover testes
 ```
 
-São 150 testes e levam cerca de 30 segundos. Os mais importantes:
+São 166 testes e levam cerca de 30 segundos. Os mais importantes:
 
 - `TesteGradiente` (`testes/test_rede.py`): para cada peso de cada
   neurônio, compara o gradiente da retropropagação (`δ · x`) com
@@ -346,6 +349,6 @@ São 150 testes e levam cerca de 30 segundos. Os mais importantes:
 | `ModuleNotFoundError: No module named 'rede'` | Rode os comandos de dentro da pasta do projeto |
 | `Arquivo não encontrado` ao informar a base | Escolha pelo número da lista, ou use o caminho completo do arquivo |
 | `a rede precisa de 3 neurônio(s) de saída` | A base tem a classe em texto: monte a rede com um neurônio de saída por classe |
-| Aviso "Use a ativação linear na saída" | A saída da base é numérica (regressão): monte a rede com `linear` na saída |
+| Aviso "Use a ativação linear na saída" | A saída da base passa do que a ativação da saída produz (sigmoid: 0 a 1; tanh: −1 a 1; relu: ≥ 0): monte a rede com `linear` na saída |
 | Regressão prevendo sempre o mesmo valor | Use `relu` na oculta, normalize as entradas e diminua a taxa (ex.: `0.00001`) |
 | A rede não aprende (acurácia baixa) | Tente mais épocas (opção 2 do menu), outra semente, mais neurônios na camada oculta ou ligar o bias |

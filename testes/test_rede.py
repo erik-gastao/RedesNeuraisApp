@@ -234,7 +234,7 @@ class TesteFormas(unittest.TestCase):
         rede = RedeNeural(2, [], 1, usar_bias=False, seed=1, ativacao_saida="linear")
         self.assertEqual(
             rede.resumo()[1],
-            "Saída: 1 neurônio, linear — degrau na classificação — 2 × 1 = 2 pesos",
+            "Saída: 1 neurônio, linear — 2 × 1 = 2 pesos",
         )
 
 

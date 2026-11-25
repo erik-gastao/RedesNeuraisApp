@@ -259,6 +259,8 @@ def separar_treino_validacao_teste(X, Y, percentuais=(70, 15, 15), seed=None):
     percentuais = [float(p) for p in percentuais]
     if len(percentuais) != 3:
         raise ValueError("Informe 3 percentuais: treino, validação e teste.")
+    if not all(np.isfinite(p) for p in percentuais):
+        raise ValueError("Os percentuais precisam ser números.")
     if any(p < 0 for p in percentuais):
         raise ValueError("Os percentuais não podem ser negativos.")
     if abs(sum(percentuais) - 100) > 1e-9:

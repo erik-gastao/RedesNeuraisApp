@@ -256,6 +256,36 @@ class TesteBaseGrande(unittest.TestCase):
         self.assertIn("Base separada: 120 para treino, 40 para validação e 40 para teste.", saida)
         self.assertNotIn("Traceback", saida)
 
+    def test_divisao_aceita_virgula_decimal(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            saida = executar([
+                "s", "1", "0", "1", "", "s", "1", base_limiar(pasta),
+                "70,5/14,5/15",   # com "/" a vírgula é decimal
+                "n", "0.5", "1", "0",
+            ])
+        self.assertIn("Base separada: 141 para treino, 29 para validação e 30 para teste.", saida)
+
+    def test_divisao_so_com_virgulas_separa(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            saida = executar([
+                "s", "1", "0", "1", "", "s", "1", base_limiar(pasta),
+                "70,15,15", "n", "0.5", "1", "0",
+            ])
+        self.assertIn("Base separada: 140 para treino, 30 para validação e 30 para teste.", saida)
+
+    def test_validacao_zero_por_cento(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            saida = executar([
+                "s", "1", "0", "1", "", "s", "1", base_limiar(pasta),
+                "80/0/20", "s", "", "0.5", "20",
+                "2", "5",   # treinar mais também funciona sem validação
+                "0",
+            ])
+        self.assertIn("Base separada: 160 para treino, 0 para validação e 40 para teste.", saida)
+        self.assertNotIn("| validação", saida)
+        self.assertIn("MSE treino:", saida)
+        self.assertNotIn("Traceback", saida)
+
     def test_iris_com_normalizacao_por_lotes(self):
         saida = executar([
             "s", "4", "1", "5", "sigmoid", "3", "", "s", "1",
@@ -269,6 +299,7 @@ class TesteBaseGrande(unittest.TestCase):
         self.assertIn("o mínimo é 2", saida)
         self.assertIn("o máximo é 106", saida)
         self.assertIn("normalizadas em 4 lote(s) de ~30 registros", saida)
+        self.assertIn("foge do padrão do enunciado", saida)
         self.assertGreaterEqual(numero_depois(saida, "Acurácia: "), 80)
 
 
@@ -292,7 +323,33 @@ class TesteRegressao(unittest.TestCase):
     def test_regressao_com_sigmoid_avisa(self):
         with tempfile.TemporaryDirectory() as pasta:
             saida = executar(["s", "1", "0", "1", "", "s", "1", base_reta(pasta)])
-        self.assertIn("não será normalizada. Use a ativação linear na saída.", saida)
+        self.assertIn("a saída esperada vai de 100.137 a 149.861 e não é normalizada", saida)
+        self.assertIn("só produz valores entre 0 e 1. Use a ativação linear na saída.", saida)
+
+    def test_saida_entre_0_e_1_com_sigmoid_nao_avisa(self):
+        # Regressão com y entre 0,2 e 0,8: a sigmoid alcança, então sem aviso.
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "dentro.csv"
+            caminho.write_text("x,y\n" + "\n".join(
+                f"{i / 19:.4f},{0.2 + 0.6 * i / 19:.4f}" for i in range(20)), encoding="utf-8")
+            saida = executar(["s", "1", "0", "1", "", "s", "1", str(caminho)])
+        self.assertNotIn("Atenção", saida)
+
+    def test_relu_com_saida_negativa_avisa(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "negativa.csv"
+            caminho.write_text("x,y\n" + "\n".join(
+                f"{i / 19:.4f},{-5 + i / 19:.4f}" for i in range(20)), encoding="utf-8")
+            saida = executar(["s", "1", "0", "1", "relu", "s", "1", str(caminho)])
+        self.assertIn("a ativação relu só produz valores maiores ou iguais a 0", saida)
+
+    def test_tanh_com_saida_entre_menos_1_e_1_nao_avisa(self):
+        with tempfile.TemporaryDirectory() as pasta:
+            caminho = Path(pasta) / "simetrica.csv"
+            caminho.write_text("x,y\n" + "\n".join(
+                f"{i / 19:.4f},{-0.9 + 1.8 * i / 19:.4f}" for i in range(20)), encoding="utf-8")
+            saida = executar(["s", "1", "0", "1", "tanh", "s", "1", str(caminho)])
+        self.assertNotIn("Atenção", saida)
 
     def test_dataset_do_professor(self):
         Y = np.genfromtxt(DATASET_PROFESSOR, delimiter=",", skip_header=1)[:, -1]
@@ -350,6 +407,14 @@ class TesteSalvarCarregar(unittest.TestCase):
                 ])
             self.assertTrue((Path(pasta) / "xor.json").exists())
         self.assertIn("Rede salva em:", saida)
+
+    def test_cancelar_carregamento_volta_ao_inicio(self):
+        saida = executar([
+            "n", "s", "",          # quer carregar, mas cancela com Enter
+            "s", "2", "0", "1", "", "s", "1", XOR, "n", "", "5", "0",   # volta e cria
+        ])
+        self.assertIn("Rede montada:", saida)
+        self.assertTrue(saida.rstrip().endswith("Até mais!"))
 
     def test_carregar_arquivo_invalido_nao_quebra(self):
         with tempfile.TemporaryDirectory() as pasta:

@@ -282,6 +282,11 @@ class TesteSepararTresConjuntos(unittest.TestCase):
         with self.assertRaises(ValueError):
             self.separar(50, (110, -5, -5))
 
+    def test_percentual_nan_e_erro_em_portugues(self):
+        with self.assertRaises(ValueError) as erro:
+            self.separar(50, (float("nan"), float("nan"), float("nan")))
+        self.assertIn("números", str(erro.exception))
+
     def test_treino_zero_e_erro(self):
         with self.assertRaises(ValueError):
             self.separar(50, (0, 50, 50))
