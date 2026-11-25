@@ -13,7 +13,7 @@ from dados import (
     aplicar_normalizacao,
     carregar_csv,
     normalizar,
-    separar_treino_teste,
+    separar_treino_validacao_teste,
 )
 from rede.ativacoes import (
     ATIVACOES,
@@ -560,7 +560,9 @@ class TesteAprendizado(unittest.TestCase):
     def test_iris(self):
         # 3 classes → 3 neurônios de saída; a classe é o de maior ŷ.
         X, Y, _ = carregar_csv(PASTA_DATASET / "bezdekIris.data", n_saidas=3)
-        X_treino, Y_treino, X_teste, Y_teste, _ = separar_treino_teste(X, Y, seed=1)
+        X_treino, Y_treino, _, _, X_teste, Y_teste, _ = separar_treino_validacao_teste(
+            X, Y, (70, 15, 15), seed=1
+        )
         X_treino, minimos, maximos = normalizar(X_treino)
         X_teste = aplicar_normalizacao(X_teste, minimos, maximos)
 

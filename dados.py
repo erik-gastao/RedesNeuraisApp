@@ -274,6 +274,60 @@ def separar_treino_teste(X, Y, proporcao_teste=0.2, seed=None):
     return X[indices_treino], Y[indices_treino], X[indices_teste], Y[indices_teste], True
 
 
+def separar_treino_validacao_teste(X, Y, percentuais=(70, 15, 15), seed=None):
+    """Embaralha as amostras e divide em treino, validação e teste.
+
+    percentuais: (treino, validação, teste) em %, somando 100.
+    seed:        semente do embaralhamento (mesma seed → mesma divisão)
+
+    Devolve (X_treino, Y_treino, X_validacao, Y_validacao, X_teste, Y_teste,
+    separou).
+
+    - Treino: ajusta os pesos.
+    - Validação: só mede o erro a cada época (nunca ajusta pesos); mostra
+      se a rede está decorando o treino.
+    - Teste: reservado para a avaliação final.
+
+    Embaralhar é essencial em bases ordenadas por classe (como a Iris).
+    Se a base tiver menos de 10 linhas (XOR, AND), não divide: os três
+    conjuntos são a base inteira e `separou` vem False, para o main.py avisar.
+    """
+    percentuais = [float(p) for p in percentuais]
+    if len(percentuais) != 3:
+        raise ValueError("Informe 3 percentuais: treino, validação e teste.")
+    if any(p < 0 for p in percentuais):
+        raise ValueError("Os percentuais não podem ser negativos.")
+    if abs(sum(percentuais) - 100) > 1e-9:
+        raise ValueError(f"Os percentuais precisam somar 100 (somam {sum(percentuais):g}).")
+    if percentuais[0] == 0:
+        raise ValueError("O treino precisa de mais de 0%.")
+
+    N = X.shape[0]
+    if N < MINIMO_PARA_SEPARAR:
+        return X, Y, X, Y, X, Y, False
+
+    n_validacao = round(N * percentuais[1] / 100)
+    n_teste = round(N * percentuais[2] / 100)
+    if N - n_validacao - n_teste < 1:
+        raise ValueError("Com esses percentuais não sobra nenhuma amostra para o treino.")
+
+    # Embaralha os índices das linhas (X e Y continuam alinhados).
+    indices = np.random.default_rng(seed).permutation(N)
+    teste = indices[:n_teste]
+    validacao = indices[n_teste:n_teste + n_validacao]
+    treino = indices[n_teste + n_validacao:]
+    return X[treino], Y[treino], X[validacao], Y[validacao], X[teste], Y[teste], True
+
+
+def e_classificacao(Y, classes):
+    """True se a base é de classificação, False se é de regressão.
+
+    Classificação: classes em texto (Iris) ou saídas só com 0 e 1 (XOR).
+    Regressão: saídas numéricas quaisquer (ex.: produtividade em kg/ha).
+    """
+    return classes is not None or bool(np.all((Y == 0) | (Y == 1)))
+
+
 def acuracia(Y, Y_classificado):
     """Fração de amostras classificadas corretamente (entre 0 e 1).
 

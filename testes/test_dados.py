@@ -17,7 +17,8 @@ from dados import (
     listar_bases,
     normalizar,
     normalizar_por_lotes,
-    separar_treino_teste,
+    e_classificacao,
+    separar_treino_validacao_teste,
 )
 
 PASTA_BASES = Path(__file__).resolve().parent.parent / "bases"
@@ -237,54 +238,98 @@ class TesteDesnormalizar(unittest.TestCase):
         np.testing.assert_array_equal(Y_norm, Y)
 
 
-class TesteSepararTreinoTeste(unittest.TestCase):
+class TesteSepararTresConjuntos(unittest.TestCase):
+    """Divisão aleatória em treino, validação e teste (seção 1.9)."""
 
     def base(self, n):
         X = np.arange(n * 2, dtype=float).reshape(n, 2)
         Y = np.arange(n, dtype=float).reshape(n, 1)
         return X, Y
 
-    def test_base_pequena_nao_separa(self):
-        X, Y = self.base(4)
-        X_treino, Y_treino, X_teste, Y_teste, separou = separar_treino_teste(X, Y, seed=1)
-        self.assertFalse(separou)
-        np.testing.assert_array_equal(X_treino, X)
-        np.testing.assert_array_equal(X_teste, X)
-        np.testing.assert_array_equal(Y_treino, Y)
-        np.testing.assert_array_equal(Y_teste, Y)
+    def separar(self, n, percentuais=(70, 15, 15), seed=1):
+        X, Y = self.base(n)
+        return separar_treino_validacao_teste(X, Y, percentuais, seed=seed)
 
-    def test_tamanhos(self):
-        X, Y = self.base(50)
-        X_treino, Y_treino, X_teste, Y_teste, separou = separar_treino_teste(X, Y, seed=1)
+    def test_tamanhos_70_15_15(self):
+        X_tr, Y_tr, X_va, Y_va, X_te, Y_te, separou = self.separar(100)
         self.assertTrue(separou)
-        self.assertEqual(X_treino.shape, (40, 2))
-        self.assertEqual(Y_treino.shape, (40, 1))
-        self.assertEqual(X_teste.shape, (10, 2))
-        self.assertEqual(Y_teste.shape, (10, 1))
+        self.assertEqual([len(X_tr), len(X_va), len(X_te)], [70, 15, 15])
+        self.assertEqual([len(Y_tr), len(Y_va), len(Y_te)], [70, 15, 15])
+
+    def test_dataset_do_professor(self):
+        # 179 linhas: 15% = 26,85 → 27 na validação e 27 no teste.
+        conjuntos = self.separar(179)
+        self.assertEqual([len(conjuntos[i]) for i in (0, 2, 4)], [125, 27, 27])
+
+    def test_percentuais_configuraveis(self):
+        conjuntos = self.separar(50, (60, 20, 20))
+        self.assertEqual([len(conjuntos[i]) for i in (0, 2, 4)], [30, 10, 10])
 
     def test_nenhuma_amostra_se_perde_nem_se_repete(self):
-        X, Y = self.base(50)
-        _, Y_treino, _, Y_teste, _ = separar_treino_teste(X, Y, seed=1)
-        juntos = np.sort(np.concatenate([Y_treino, Y_teste]).ravel())
-        np.testing.assert_array_equal(juntos, Y.ravel())
+        X_tr, Y_tr, X_va, Y_va, X_te, Y_te, _ = self.separar(50)
+        juntos = np.sort(np.concatenate([Y_tr, Y_va, Y_te]).ravel())
+        np.testing.assert_array_equal(juntos, np.arange(50))
 
     def test_x_e_y_continuam_alinhados(self):
-        # Na base de teste, a linha i tem X = [2i, 2i + 1] e Y = [i].
-        X, Y = self.base(50)
-        X_treino, Y_treino, X_teste, Y_teste, _ = separar_treino_teste(X, Y, seed=1)
-        np.testing.assert_array_equal(X_treino[:, 0], 2 * Y_treino[:, 0])
-        np.testing.assert_array_equal(X_teste[:, 0], 2 * Y_teste[:, 0])
+        # Linha i: X = [2i, 2i + 1] e Y = [i].
+        X_tr, Y_tr, X_va, Y_va, X_te, Y_te, _ = self.separar(50)
+        for X_parte, Y_parte in ((X_tr, Y_tr), (X_va, Y_va), (X_te, Y_te)):
+            np.testing.assert_array_equal(X_parte[:, 0], 2 * Y_parte[:, 0])
 
     def test_embaralha(self):
-        X, Y = self.base(50)
-        _, _, _, Y_teste, _ = separar_treino_teste(X, Y, seed=1)
-        self.assertFalse(np.array_equal(Y_teste.ravel(), np.arange(10)))
+        Y_tr = self.separar(50)[1]
+        self.assertFalse(np.array_equal(Y_tr.ravel(), np.arange(len(Y_tr))))
 
-    def test_mesma_seed_mesma_separacao(self):
-        X, Y = self.base(50)
-        a = separar_treino_teste(X, Y, seed=5)
-        b = separar_treino_teste(X, Y, seed=5)
-        np.testing.assert_array_equal(a[2], b[2])
+    def test_mesma_seed_mesma_divisao(self):
+        a = self.separar(50, seed=5)
+        b = self.separar(50, seed=5)
+        for parte_a, parte_b in zip(a[:6], b[:6]):
+            np.testing.assert_array_equal(parte_a, parte_b)
+
+    def test_validacao_zero_por_cento(self):
+        X_tr, Y_tr, X_va, Y_va, X_te, Y_te, _ = self.separar(50, (80, 0, 20))
+        self.assertEqual(X_va.shape, (0, 2))
+        self.assertEqual(Y_va.shape, (0, 1))
+        self.assertEqual([len(X_tr), len(X_te)], [40, 10])
+
+    def test_soma_diferente_de_100_e_erro(self):
+        with self.assertRaises(ValueError) as erro:
+            self.separar(50, (70, 20, 20))
+        self.assertIn("100", str(erro.exception))
+
+    def test_percentual_negativo_e_erro(self):
+        with self.assertRaises(ValueError):
+            self.separar(50, (110, -5, -5))
+
+    def test_treino_zero_e_erro(self):
+        with self.assertRaises(ValueError):
+            self.separar(50, (0, 50, 50))
+
+    def test_precisa_de_tres_percentuais(self):
+        with self.assertRaises(ValueError):
+            self.separar(50, (70, 30))
+
+    def test_base_pequena_nao_separa(self):
+        # Menos de 10 linhas (XOR, AND): os 3 conjuntos são a base inteira.
+        X, Y = self.base(4)
+        X_tr, Y_tr, X_va, Y_va, X_te, Y_te, separou = separar_treino_validacao_teste(X, Y, seed=1)
+        self.assertFalse(separou)
+        for parte in (X_tr, X_va, X_te):
+            np.testing.assert_array_equal(parte, X)
+        for parte in (Y_tr, Y_va, Y_te):
+            np.testing.assert_array_equal(parte, Y)
+
+
+class TesteTipoDeProblema(unittest.TestCase):
+
+    def test_classes_em_texto_e_classificacao(self):
+        self.assertTrue(e_classificacao(np.array([[1.0, 0.0, 0.0]]), ["a", "b", "c"]))
+
+    def test_saida_zero_ou_um_e_classificacao(self):
+        self.assertTrue(e_classificacao(np.array([[0.0], [1.0]]), None))
+
+    def test_saida_numerica_e_regressao(self):
+        self.assertFalse(e_classificacao(np.array([[2252.4], [1.0]]), None))
 
 
 class TesteAcuracia(unittest.TestCase):
