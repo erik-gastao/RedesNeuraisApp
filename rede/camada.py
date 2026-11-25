@@ -3,22 +3,22 @@
 import numpy as np
 
 from rede.ativacoes import ATIVACOES
+from rede.inicializacao import pesos_iniciais
+from rede.neuronio import Neuronio
 
 
 class Camada:
-    """Uma camada da rede (oculta ou de saída).
+    """Uma camada da rede (oculta ou de saída), formada por Neuronios.
 
-    Cada neurônio desta camada recebe a saída de TODOS os neurônios da camada
-    anterior. Por isso os pesos formam uma matriz W com forma
-    (n_neuronios, n_entradas): a linha i guarda os pesos que chegam no
-    neurônio i, e a coluna j corresponde ao neurônio j da camada anterior.
+    Cada neurônio recebe a saída de TODOS os neurônios da camada anterior,
+    e todos usam a mesma função de ativação (a da camada).
     """
 
     def __init__(self, n_entradas, n_neuronios, nome_ativacao, usar_bias, gerador):
         """
         n_entradas:    quantos neurônios tem a camada anterior
         n_neuronios:   quantos neurônios tem esta camada
-        nome_ativacao: "sigmoid", "relu" ou "tanh"
+        nome_ativacao: "sigmoid", "relu", "tanh" ou "linear"
         usar_bias:     se False, o bias fica zerado e nunca é atualizado
         gerador:       np.random.Generator usado para sortear os pesos
         """
@@ -32,86 +32,57 @@ class Camada:
         self.n_neuronios = n_neuronios
         self.nome_ativacao = nome_ativacao
         self.usar_bias = usar_bias
-        self.ativacao, self.derivada_ativacao = ATIVACOES[nome_ativacao]
 
-        # Pesos iniciais aleatórios, distribuição uniforme entre -1 e 1.
-        self.W = gerador.uniform(-1, 1, size=(n_neuronios, n_entradas))
-        # Bias começa em zero (um por neurônio).
-        self.b = np.zeros(n_neuronios)
+        # Pesos iniciais Xavier/He (ver inicializacao.py); bias começa em 0.
+        # A linha i da matriz vira os pesos do neurônio i.
+        pesos = pesos_iniciais(n_entradas, n_neuronios, nome_ativacao, gerador)
+        self.neuronios = [
+            Neuronio(pesos[i].copy(), 0.0, nome_ativacao, usar_bias)
+            for i in range(n_neuronios)
+        ]
 
-        # Valores guardados pelo forward; o backward vai precisar deles.
-        self.A_anterior = None
-        self.Z = None
-        self.A = None
+    def forward(self, entradas):
+        """Passa um exemplo pela camada: cada neurônio calcula sua saída.
 
-        # Gradientes calculados pelo backward e usados pelo atualizar.
-        self.dW = np.zeros_like(self.W)  # ∂E/∂W, mesma forma de W
-        self.db = np.zeros_like(self.b)  # ∂E/∂b, mesma forma de b
-
-    def forward(self, A_anterior):
-        """Calcula a saída da camada (propagação para frente).
-
-        A_anterior: saídas da camada anterior, forma (N, n_entradas),
-                    onde N é o número de amostras.
-        Devolve A, forma (N, n_neuronios).
+        entradas: saídas da camada anterior, forma (n_entradas,).
+        Devolve as saídas da camada, forma (n_neuronios,).
         """
-        # Soma ponderada: para cada amostra, z_i = Σ_j (w_ij · a_j) + b_i.
-        # Em matriz: Z = A_anterior · Wᵀ + b
-        Z = A_anterior @ self.W.T + self.b
-        # Saída do neurônio: a = f(z)
-        A = self.ativacao(Z)
+        return np.array([neuronio.ativar(entradas) for neuronio in self.neuronios])
 
-        self.A_anterior = A_anterior
-        self.Z = Z
-        self.A = A
-        return A
+    def backward(self, dE_da):
+        """Calcula o delta de cada neurônio e devolve ∂E/∂a da camada anterior.
 
-    def backward(self, dA):
-        """Calcula os gradientes da camada (propagação para trás).
+        dE_da: ∂E/∂a de cada neurônio desta camada, forma (n_neuronios,).
 
-        dA: ∂E/∂A desta camada, forma (N, n_neuronios). Diz quanto o erro
-            muda quando a saída de cada neurônio muda.
-        Guarda dW e db, e devolve ∂E/∂A da camada ANTERIOR, forma
-        (N, n_entradas), para o backpropagation continuar para trás.
-
-        Tudo vem da regra da cadeia, seguindo o caminho W → Z → A → E.
-        Precisa ser chamado depois do forward (usa A_anterior, Z e A).
+        A saída a_j da camada anterior chega em todos os neurônios i daqui
+        multiplicada por w_ij, então ∂E/∂a_j = Σ_i δ_i · w_ij.
+        Usa os pesos atuais: por isso a rede calcula os deltas de todas as
+        camadas antes de atualizar qualquer peso.
         """
-        # Passo A → Z: como a = f(z), então ∂E/∂z = ∂E/∂a · f'(z).
-        dZ = dA * self.derivada_ativacao(self.Z, self.A)
-
-        # Passo Z → W: como z_i = Σ_j (w_ij · a_j) + b_i, então
-        # ∂z_i/∂w_ij = a_j (a saída do neurônio j da camada anterior).
-        # Logo ∂E/∂w_ij = Σ_amostras (dz_i · a_j). Em matriz: dW = dZᵀ · A_anterior.
-        # A soma sobre as amostras acontece no produto; o 1/N já veio na
-        # derivada do erro.
-        self.dW = dZ.T @ self.A_anterior
-
-        # Passo Z → b: ∂z_i/∂b_i = 1, então ∂E/∂b_i = Σ_amostras dz_i.
-        if self.usar_bias:
-            self.db = dZ.sum(axis=0)
-
-        # Passo Z → A_anterior: ∂z_i/∂a_j = w_ij. Cada neurônio j da camada
-        # anterior influencia todos os neurônios daqui, então soma em i:
-        # ∂E/∂a_j = Σ_i (dz_i · w_ij). Em matriz: dA_anterior = dZ · W.
-        # Usa o W atual: por isso o backward de todas as camadas roda antes
-        # de qualquer atualização de pesos.
-        return dZ @ self.W
+        for neuronio, derivada in zip(self.neuronios, dE_da):
+            neuronio.calcular_delta(derivada)
+        return self.deltas @ self.W
 
     def atualizar(self, taxa):
-        """Gradiente descendente: W = W − η · ∂E/∂W (e o mesmo para o bias).
+        """Atualiza pesos e bias de todos os neurônios (descida do gradiente)."""
+        for neuronio in self.neuronios:
+            neuronio.atualizar(taxa)
 
-        taxa: taxa de aprendizado (η). O sinal de menos faz o peso andar na
-        direção em que o erro diminui.
-        """
-        self.W -= taxa * self.dW
-        if self.usar_bias:
-            self.b -= taxa * self.db
+    @property
+    def W(self):
+        """Pesos da camada como matriz (n_neuronios, n_entradas). É uma cópia."""
+        return np.array([neuronio.pesos for neuronio in self.neuronios])
+
+    @property
+    def b(self):
+        """Vieses da camada, forma (n_neuronios,). É uma cópia."""
+        return np.array([neuronio.bias for neuronio in self.neuronios])
+
+    @property
+    def deltas(self):
+        """Deltas (∂E/∂z) do último exemplo, forma (n_neuronios,)."""
+        return np.array([neuronio.delta for neuronio in self.neuronios])
 
     def numero_de_pesos(self):
-        """Quantidade de pesos da camada: n_neuronios × n_entradas.
-
-        Como a ligação é total, dá para conferir pela camada anterior:
-        cada neurônio daqui tem um peso para cada neurônio de lá.
-        """
+        """Quantidade de pesos da camada: n_neuronios × n_entradas."""
         return self.n_neuronios * self.n_entradas

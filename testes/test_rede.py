@@ -30,8 +30,11 @@ from rede.ativacoes import (
     tanh,
 )
 from rede.inicializacao import pesos_iniciais
+from rede.camada import Camada
+from rede.neuronio import Neuronio
 from rede.perda import derivada_mse, mse
 from rede.rede_neural import RedeNeural
+from rede.treinamento import treinar
 
 # Pasta bases/ na raiz do projeto (este arquivo fica em testes/).
 PASTA_BASES = Path(__file__).resolve().parent.parent / "bases"
@@ -160,18 +163,20 @@ class TesteFormas(unittest.TestCase):
             self.rede.forward(np.zeros((4, 3)))
 
     def test_camada_guarda_valores_do_forward(self):
+        # Cada neurônio guarda entradas, z e a da última amostra processada.
         X = np.array([[0.0, 1.0], [1.0, 1.0]])
         self.rede.forward(X)
         oculta, saida = self.rede.camadas
-        np.testing.assert_array_equal(oculta.A_anterior, X)
-        self.assertEqual(oculta.Z.shape, (2, 3))
-        self.assertEqual(oculta.A.shape, (2, 3))
+        for neuronio in oculta.neuronios:
+            np.testing.assert_array_equal(neuronio.entradas, X[1])
+            self.assertAlmostEqual(neuronio.a, float(sigmoid(np.array(neuronio.z))))
         # A entrada da saída é a saída da oculta.
-        np.testing.assert_array_equal(saida.A_anterior, oculta.A)
+        np.testing.assert_array_equal(
+            saida.neuronios[0].entradas, [n.a for n in oculta.neuronios]
+        )
 
-    def test_pesos_iniciais_entre_menos_um_e_um(self):
+    def test_vieses_comecam_em_zero(self):
         for camada in self.rede.camadas:
-            self.assertTrue(np.all(camada.W >= -1) and np.all(camada.W <= 1))
             np.testing.assert_array_equal(camada.b, 0)
 
     def test_mesma_seed_gera_mesmos_pesos(self):
@@ -225,6 +230,114 @@ class TesteFormas(unittest.TestCase):
         )
 
 
+    def test_resumo_saida_linear(self):
+        rede = RedeNeural(2, [], 1, usar_bias=False, seed=1, ativacao_saida="linear")
+        self.assertEqual(
+            rede.resumo()[1],
+            "Saída: 1 neurônio, linear — degrau na classificação — 2 × 1 = 2 pesos",
+        )
+
+
+class TesteNeuronio(unittest.TestCase):
+    """Entidade Neurônio (seção 1.1): pesos, bias, z, a e delta."""
+
+    def neuronio(self, usar_bias=True):
+        return Neuronio(np.array([0.4, -1.2]), 0.3, "sigmoid", usar_bias)
+
+    def test_ativar_guarda_entradas_z_e_a(self):
+        n = self.neuronio()
+        a = n.ativar(np.array([0.8, 0.1]))
+        self.assertAlmostEqual(n.z, 0.4 * 0.8 - 1.2 * 0.1 + 0.3)
+        self.assertAlmostEqual(a, 1 / (1 + np.exp(-n.z)))
+        self.assertEqual(n.a, a)
+        np.testing.assert_array_equal(n.entradas, [0.8, 0.1])
+
+    def test_delta_e_derivada_vezes_dE_da(self):
+        n = self.neuronio()
+        n.ativar(np.array([0.8, 0.1]))
+        self.assertAlmostEqual(n.calcular_delta(2.0), 2.0 * n.a * (1 - n.a))
+        self.assertEqual(n.delta, n.calcular_delta(2.0))
+
+    def test_atualizar_usa_delta_e_entradas(self):
+        n = self.neuronio()
+        n.ativar(np.array([0.8, 0.1]))
+        delta = n.calcular_delta(1.5)
+        n.atualizar(0.1)
+        np.testing.assert_allclose(n.pesos, [0.4 - 0.1 * delta * 0.8, -1.2 - 0.1 * delta * 0.1])
+        self.assertAlmostEqual(n.bias, 0.3 - 0.1 * delta)
+
+    def test_sem_bias_o_bias_nao_muda(self):
+        n = Neuronio(np.array([0.4, -1.2]), 0.0, "sigmoid", usar_bias=False)
+        n.ativar(np.array([0.8, 0.1]))
+        n.calcular_delta(1.5)
+        n.atualizar(0.1)
+        self.assertEqual(n.bias, 0.0)
+
+    def test_backward_usa_pesos_antes_da_atualizacao(self):
+        # Seção 1.8: todos os deltas antes de qualquer atualização.
+        camada = Camada(3, 2, "tanh", True, np.random.default_rng(0))
+        camada.forward(np.array([0.2, -0.5, 0.9]))
+        W_antigo = camada.W
+        retorno = camada.backward(np.array([0.3, -0.7]))
+        camada.atualizar(0.5)
+        np.testing.assert_allclose(retorno, camada.deltas @ W_antigo)
+        self.assertFalse(np.allclose(camada.W, W_antigo))
+
+
+class TesteExemploAula13(unittest.TestCase):
+    """Exemplo XOR dos slides da Aula 13 (Multi-Layer Perceptron).
+
+    Pesos dos slides; vieses começam em 0. Os slides fazem a média dos
+    gradientes das 4 amostras (dividem por N = 4). No SGD cada amostra
+    usa N = 1, então delta_SGD / 4 = delta do slide.
+    """
+
+    X = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
+    Y = np.array([[0.0], [1.0], [1.0], [0.0]])
+
+    def setUp(self):
+        self.rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=True, seed=0)
+        oculta, saida = self.rede.camadas
+        for neuronio, pesos in zip(
+            oculta.neuronios, [[-0.420, 0.361], [-0.730, -0.617], [-0.941, -0.482]]
+        ):
+            neuronio.pesos = np.array(pesos)
+        saida.neuronios[0].pesos = np.array([-0.015, -0.902, 0.136])
+
+    def test_forward_e_mse(self):
+        y_hat = self.rede.forward(self.X)
+        np.testing.assert_allclose(y_hat[:, 0], [0.4036, 0.4322, 0.4351, 0.4583], atol=1e-4)
+        self.assertAlmostEqual(mse(self.Y, y_hat), 0.25363, delta=1e-4)
+
+    def test_deltas_e_gradientes_da_saida(self):
+        oculta, saida = self.rede.camadas
+        deltas, gradientes_w, gradiente_b = [], np.zeros(3), 0.0
+        for x, y in zip(self.X, self.Y):
+            self.rede.forward(x)
+            self.rede.retropropagar(y)
+            delta = saida.neuronios[0].delta / 4
+            deltas.append(delta)
+            gradientes_w += delta * np.array([n.a for n in oculta.neuronios])
+            gradiente_b += delta
+        np.testing.assert_allclose(deltas, [0.04857, -0.06967, -0.06943, 0.05690], atol=1e-5)
+        np.testing.assert_allclose(gradientes_w, [-0.01669, -0.01097, -0.01075], atol=1e-5)
+        self.assertAlmostEqual(gradiente_b, -0.03363, delta=1e-5)
+
+    def test_deltas_da_camada_oculta(self):
+        # Slide 14 (usa os pesos originais da saída, antes do ajuste).
+        esperado = [
+            [-0.00018215, -0.01095348, 0.00165152],
+            [0.00025294, 0.01430602, -0.00223646],
+            [0.00024919, 0.01374150, -0.00190632],
+            [-0.00021317, -0.00840496, 0.00121082],
+        ]
+        oculta = self.rede.camadas[0]
+        for x, y, linha in zip(self.X, self.Y, esperado):
+            self.rede.forward(x)
+            self.rede.retropropagar(y)
+            np.testing.assert_allclose(oculta.deltas / 4, linha, atol=1e-6)
+
+
 class TesteExemploDaAula(unittest.TestCase):
     """Teste 3 do plano: exemplo feito à mão na aula (sem bias)."""
 
@@ -232,13 +345,13 @@ class TesteExemploDaAula(unittest.TestCase):
         rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=False, seed=7)
         oculta, saida = rede.camadas
         # Pesos da saída atribuídos manualmente; os da oculta ficam aleatórios.
-        saida.W = np.array([[-0.015, -0.902, 0.136]])
+        saida.neuronios[0].pesos = np.array([-0.015, -0.902, 0.136])
 
         y_hat = rede.forward(np.array([[0.0, 0.0]]))
 
         # Entrada (0, 0) sem bias: z = 0 em todos os ocultos, qualquer que
         # seja o peso, então a = sigmoid(0) = 0,5.
-        np.testing.assert_array_equal(oculta.A, [[0.5, 0.5, 0.5]])
+        self.assertEqual([n.a for n in oculta.neuronios], [0.5, 0.5, 0.5])
         # z da saída = 0,5 · (−0,015 − 0,902 + 0,136) = −0,3905
         # ŷ = sigmoid(−0,3905) ≈ 0,4036
         self.assertAlmostEqual(y_hat[0, 0], 0.4036, delta=1e-4)
@@ -274,53 +387,65 @@ class TesteGradiente(unittest.TestCase):
 
     EPS = 1e-5
 
-    def gradiente_numerico(self, rede, parametro, X, Y):
-        numerico = np.zeros_like(parametro)
-        for indice in np.ndindex(parametro.shape):
-            original = parametro[indice]
-            parametro[indice] = original + self.EPS
-            erro_mais = mse(Y, rede.forward(X))
-            parametro[indice] = original - self.EPS
-            erro_menos = mse(Y, rede.forward(X))
-            parametro[indice] = original
-            numerico[indice] = (erro_mais - erro_menos) / (2 * self.EPS)
-        return numerico
-
     def conferir(self, analitico, numerico, descricao):
         diferenca = np.linalg.norm(analitico - numerico)
         tamanho = np.linalg.norm(analitico) + np.linalg.norm(numerico)
+        if tamanho < 1e-12:
+            # Ex.: neurônio ReLU com z < 0 neste exemplo: os dois gradientes são 0.
+            return
         self.assertLess(diferenca / tamanho, 1e-5, descricao)
 
-    def conferir_rede(self, rede, X, Y, descricao):
-        # Gradientes do backpropagation (sem atualizar os pesos).
-        dA = derivada_mse(Y, rede.forward(X))
-        for camada in reversed(rede.camadas):
-            dA = camada.backward(dA)
+    def conferir_rede(self, rede, x, y, descricao):
+        # SGD: gradiente de UM exemplo. Para o peso j do neurônio,
+        # ∂E/∂w_j = delta · entrada_j; para o bias, ∂E/∂b = delta.
+        Y = y.reshape(1, -1)
+        rede.forward(x)
+        rede.retropropagar(y)
+        analiticos = [
+            [(n.delta * n.entradas.copy(), n.delta) for n in camada.neuronios]
+            for camada in rede.camadas
+        ]
 
         for i, camada in enumerate(rede.camadas):
-            self.conferir(
-                camada.dW,
-                self.gradiente_numerico(rede, camada.W, X, Y),
-                f"{descricao}, camada {i}, W",
-            )
-            if camada.usar_bias:
-                self.conferir(
-                    camada.db,
-                    self.gradiente_numerico(rede, camada.b, X, Y),
-                    f"{descricao}, camada {i}, b",
-                )
+            for k, neuronio in enumerate(camada.neuronios):
+                dW, db = analiticos[i][k]
+                numerico = np.zeros_like(neuronio.pesos)
+                for j in range(len(neuronio.pesos)):
+                    original = neuronio.pesos[j]
+                    neuronio.pesos[j] = original + self.EPS
+                    erro_mais = mse(Y, rede.forward(x))
+                    neuronio.pesos[j] = original - self.EPS
+                    erro_menos = mse(Y, rede.forward(x))
+                    neuronio.pesos[j] = original
+                    numerico[j] = (erro_mais - erro_menos) / (2 * self.EPS)
+                self.conferir(dW, numerico, f"{descricao}, camada {i}, neurônio {k}, pesos")
+                if camada.usar_bias:
+                    original = neuronio.bias
+                    neuronio.bias = original + self.EPS
+                    erro_mais = mse(Y, rede.forward(x))
+                    neuronio.bias = original - self.EPS
+                    erro_menos = mse(Y, rede.forward(x))
+                    neuronio.bias = original
+                    numerico_b = (erro_mais - erro_menos) / (2 * self.EPS)
+                    self.assertAlmostEqual(db, numerico_b, delta=1e-6,
+                                           msg=f"{descricao}, camada {i}, neurônio {k}, bias")
 
     def dados(self, n_entradas, n_saidas):
         gerador = np.random.default_rng(0)
-        X = gerador.uniform(-1, 1, size=(5, n_entradas))
-        Y = gerador.integers(0, 2, size=(5, n_saidas)).astype(float)
-        return X, Y
+        x = gerador.uniform(-1, 1, size=n_entradas)
+        y = gerador.integers(0, 2, size=n_saidas).astype(float)
+        return x, y
 
     def test_cada_ativacao_com_bias(self):
         X, Y = self.dados(3, 2)
         for nome in ATIVACOES:
             rede = RedeNeural(3, [(4, nome)], 2, usar_bias=True, seed=3)
             self.conferir_rede(rede, X, Y, nome)
+
+    def test_saida_linear(self):
+        X, Y = self.dados(3, 1)
+        rede = RedeNeural(3, [(4, "relu")], 1, usar_bias=True, seed=3, ativacao_saida="linear")
+        self.conferir_rede(rede, X, Y, "saída linear")
 
     def test_duas_ocultas_com_ativacoes_diferentes(self):
         X, Y = self.dados(3, 1)
@@ -339,49 +464,79 @@ class TesteGradiente(unittest.TestCase):
 
 
 class TesteTreino(unittest.TestCase):
-    """Comportamento do laço de treino."""
+    """Treino com SGD (seção 1.10): rede/treinamento.py."""
 
     X = np.array([[0.0, 0.0], [0.0, 1.0], [1.0, 0.0], [1.0, 1.0]])
     Y = np.array([[0.0], [0.0], [0.0], [1.0]])
 
-    def test_historico_tem_um_erro_por_epoca(self):
-        rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=True, seed=1)
-        historico = rede.treinar(self.X, self.Y, epocas=20, taxa=0.5)
-        self.assertEqual(len(historico), 20)
+    def rede(self, usar_bias=True):
+        return RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=usar_bias, seed=1)
+
+    def test_treinar_exemplo_muda_os_pesos_de_todas_as_camadas(self):
+        rede = self.rede()
+        antes = [camada.W for camada in rede.camadas]
+        rede.treinar_exemplo(self.X[3], self.Y[3], 0.5)
+        for camada, W in zip(rede.camadas, antes):
+            self.assertFalse(np.allclose(camada.W, W))
+
+    def test_historico_tem_treino_e_validacao_por_epoca(self):
+        historico = treinar(self.rede(), self.X, self.Y, 20, 0.5,
+                            X_validacao=self.X, Y_validacao=self.Y, seed=0)
+        self.assertEqual(len(historico["treino"]), 20)
+        self.assertEqual(len(historico["validacao"]), 20)
+
+    def test_sem_validacao_lista_vazia(self):
+        historico = treinar(self.rede(), self.X, self.Y, 5, 0.5, seed=0)
+        self.assertEqual(historico["validacao"], [])
 
     def test_erro_diminui(self):
-        rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=True, seed=1)
-        historico = rede.treinar(self.X, self.Y, epocas=200, taxa=0.5)
-        self.assertLess(historico[-1], historico[0])
+        historico = treinar(self.rede(), self.X, self.Y, 200, 0.5, seed=0)
+        self.assertLess(historico["treino"][-1], historico["treino"][0])
 
-    def test_funcao_de_progresso_e_chamada_a_cada_epoca(self):
-        rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=True, seed=1)
+    def test_callback_recebe_epoca_treino_e_validacao(self):
         chamadas = []
-        historico = rede.treinar(
-            self.X, self.Y, epocas=5, taxa=0.5,
-            ao_fim_da_epoca=lambda epoca, erro: chamadas.append((epoca, erro)),
+        historico = treinar(
+            self.rede(), self.X, self.Y, 5, 0.5, X_validacao=self.X, Y_validacao=self.Y,
+            seed=0, ao_fim_da_epoca=lambda *args: chamadas.append(args),
         )
-        self.assertEqual([epoca for epoca, _ in chamadas], [1, 2, 3, 4, 5])
-        self.assertEqual([erro for _, erro in chamadas], historico)
+        self.assertEqual([c[0] for c in chamadas], [1, 2, 3, 4, 5])
+        self.assertEqual([c[1] for c in chamadas], historico["treino"])
+        self.assertEqual([c[2] for c in chamadas], historico["validacao"])
+
+    def test_callback_sem_validacao_recebe_none(self):
+        chamadas = []
+        treinar(self.rede(), self.X, self.Y, 2, 0.5, seed=0,
+                ao_fim_da_epoca=lambda *args: chamadas.append(args))
+        self.assertEqual([c[2] for c in chamadas], [None, None])
+
+    def test_mesma_seed_mesmo_treino(self):
+        a = treinar(self.rede(), self.X, self.Y, 10, 0.5, seed=3)
+        b = treinar(self.rede(), self.X, self.Y, 10, 0.5, seed=3)
+        self.assertEqual(a, b)
 
     def test_sem_bias_o_bias_continua_zero(self):
-        rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=False, seed=1)
-        rede.treinar(self.X, self.Y, epocas=50, taxa=0.5)
+        rede = self.rede(usar_bias=False)
+        treinar(rede, self.X, self.Y, 50, 0.5, seed=0)
         for camada in rede.camadas:
             np.testing.assert_array_equal(camada.b, 0)
 
     def test_y_com_forma_errada_da_erro(self):
-        rede = RedeNeural(2, [(3, "sigmoid")], 1, usar_bias=True, seed=1)
         with self.assertRaises(ValueError):
-            rede.treinar(self.X, np.zeros((4, 2)), epocas=1, taxa=0.5)
+            treinar(self.rede(), self.X, np.zeros((4, 2)), 1, 0.5)
+
+    def test_saida_linear_aprende_uma_reta(self):
+        # Regressão: y = 3x + 2, sem normalizar Y (a saída linear alcança).
+        x = np.linspace(0, 1, 50).reshape(-1, 1)
+        y = 3 * x + 2
+        rede = RedeNeural(1, [], 1, usar_bias=True, seed=1, ativacao_saida="linear")
+        historico = treinar(rede, x, y, 200, 0.1, seed=0)
+        self.assertLess(historico["treino"][-1], 1e-3)
 
 
 class TesteAprendizado(unittest.TestCase):
-    """Teste 5 do plano: a rede aprende de verdade as bases AND e XOR."""
+    """A rede aprende de verdade as bases AND, XOR e Iris (com SGD)."""
 
     def carregar(self, nome):
-        # Leitura direta (o dados.py, da etapa 5, ainda não é usado aqui).
-        # Pula o cabeçalho; a última coluna é a saída esperada.
         tabela = np.genfromtxt(PASTA_BASES / nome, delimiter=",", skip_header=1)
         return tabela[:, :-1], tabela[:, -1:]
 
@@ -389,42 +544,38 @@ class TesteAprendizado(unittest.TestCase):
         return int(np.sum(np.all(rede.classificar(X) == Y, axis=1)))
 
     def test_and_sem_camada_oculta(self):
-        # AND é linearmente separável: uma reta divide as classes, então
-        # um único neurônio (perceptron) resolve.
+        # AND é linearmente separável: um único neurônio (perceptron) resolve.
         X, Y = self.carregar("and.csv")
         rede = RedeNeural(2, [], 1, usar_bias=True, seed=42)
-        rede.treinar(X, Y, epocas=5000, taxa=0.5)
+        treinar(rede, X, Y, 1000, 0.5, seed=42)
         self.assertEqual(self.acertos(rede, X, Y), 4)
 
     def test_xor_com_camada_oculta(self):
         X, Y = self.carregar("xor.csv")
         rede = RedeNeural(2, [(4, "sigmoid")], 1, usar_bias=True, seed=42)
-        historico = rede.treinar(X, Y, epocas=10000, taxa=0.5)
+        historico = treinar(rede, X, Y, 3000, 0.5, seed=42)
         self.assertEqual(self.acertos(rede, X, Y), 4)
-        self.assertLess(historico[-1], 0.05)
+        self.assertLess(historico["treino"][-1], 0.05)
 
     def test_iris(self):
         # 3 classes → 3 neurônios de saída; a classe é o de maior ŷ.
-        # Versicolor e virginica se misturam um pouco, então o esperado é
-        # perto de 95%, não 100%.
         X, Y, _ = carregar_csv(PASTA_DATASET / "bezdekIris.data", n_saidas=3)
         X_treino, Y_treino, X_teste, Y_teste, _ = separar_treino_teste(X, Y, seed=1)
         X_treino, minimos, maximos = normalizar(X_treino)
         X_teste = aplicar_normalizacao(X_teste, minimos, maximos)
 
         rede = RedeNeural(4, [(5, "sigmoid")], 3, usar_bias=True, seed=1)
-        rede.treinar(X_treino, Y_treino, epocas=5000, taxa=0.5)
+        treinar(rede, X_treino, Y_treino, 200, 0.1, seed=1)
 
         self.assertGreaterEqual(acuracia(Y_teste, rede.classificar(X_teste)), 0.9)
         self.assertGreaterEqual(acuracia(Y_treino, rede.classificar(X_treino)), 0.9)
 
     def test_xor_sem_camada_oculta_nao_aprende(self):
-        # XOR não é linearmente separável: nenhuma reta divide as classes.
-        # Sem camada oculta a rede nunca chega a 100%, com qualquer seed.
+        # XOR não é linearmente separável: sem oculta nunca chega a 100%.
         X, Y = self.carregar("xor.csv")
         for seed in range(5):
             rede = RedeNeural(2, [], 1, usar_bias=True, seed=seed)
-            rede.treinar(X, Y, epocas=10000, taxa=0.5)
+            treinar(rede, X, Y, 1000, 0.5, seed=seed)
             self.assertLess(self.acertos(rede, X, Y), 4, f"seed {seed}")
 
 

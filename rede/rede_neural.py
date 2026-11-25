@@ -5,7 +5,7 @@ import numpy as np
 from rede.ativacoes import classificar as aplicar_degrau
 from rede.ativacoes import maior_saida
 from rede.camada import Camada
-from rede.perda import derivada_mse, mse
+from rede.perda import derivada_mse
 
 
 class RedeNeural:
@@ -15,24 +15,23 @@ class RedeNeural:
     sem pesos e sem função de ativação.
     """
 
-    # Ativação da camada de saída, fixa no código.
-    # O degrau não tem derivada útil, então não dá para treinar com ele.
-    # Por isso a saída usa sigmoid no treino, e o degrau (1 se ŷ ≥ 0,5,
-    # senão 0) é aplicado só em classificar(), para gerar a classe final.
-    ATIVACAO_SAIDA = "sigmoid"
-
-    def __init__(self, n_entradas, ocultas, n_saidas, usar_bias, seed=None):
+    def __init__(self, n_entradas, ocultas, n_saidas, usar_bias, seed=None,
+                 ativacao_saida="sigmoid"):
         """
-        n_entradas: neurônios da camada de entrada (colunas de X)
-        ocultas:    lista de (n_neuronios, nome_ativacao), uma por camada
-                    oculta. Lista vazia = sem oculta (perceptron simples).
-        n_saidas:   neurônios da camada de saída
-        usar_bias:  vale para todas as camadas
-        seed:       semente para repetir o experimento (None = aleatória)
+        n_entradas:     neurônios da camada de entrada (colunas de X)
+        ocultas:        lista de (n_neuronios, nome_ativacao), uma por camada
+                        oculta. Lista vazia = sem oculta (perceptron simples).
+        n_saidas:       neurônios da camada de saída
+        usar_bias:      vale para todas as camadas
+        seed:           semente para repetir o experimento (None = aleatória)
+        ativacao_saida: ativação da camada de saída. "sigmoid" para
+                        classificação (ŷ entre 0 e 1); "linear" para
+                        regressão (saídas esperadas não normalizadas).
         """
         self.n_entradas = n_entradas
         self.n_saidas = n_saidas
         self.usar_bias = usar_bias
+        self.ativacao_saida = ativacao_saida
 
         # Um único gerador para todas as camadas: com a mesma seed, a rede
         # inteira nasce com os mesmos pesos.
@@ -49,81 +48,71 @@ class RedeNeural:
             n_anterior = n_neuronios
 
         self.camadas.append(
-            Camada(n_anterior, n_saidas, self.ATIVACAO_SAIDA, usar_bias, gerador)
+            Camada(n_anterior, n_saidas, ativacao_saida, usar_bias, gerador)
         )
 
     def forward(self, X):
-        """Propaga as entradas pela rede, camada por camada.
+        """Propagação direta, um exemplo por vez, camada por camada.
 
         X: forma (N, n_entradas). Uma amostra só, forma (n_entradas,),
            também é aceita e tratada como N = 1.
-        Devolve Ŷ, forma (N, n_saidas).
-        """
-        A = np.atleast_2d(np.asarray(X, dtype=float))
-        if A.shape[1] != self.n_entradas:
-            raise ValueError(
-                f"A rede espera {self.n_entradas} entradas por amostra, "
-                f"mas recebeu {A.shape[1]}."
-            )
-
-        # A saída de uma camada é a entrada da próxima.
-        for camada in self.camadas:
-            A = camada.forward(A)
-        return A
-
-    def treinar(self, X, Y, epocas, taxa, ao_fim_da_epoca=None):
-        """Treina a rede com gradiente descendente usando a base inteira.
-
-        X:      entradas, forma (N, n_entradas)
-        Y:      saídas esperadas, forma (N, n_saidas)
-        epocas: quantas vezes a base inteira passa pela rede
-        taxa:   taxa de aprendizado (η)
-        ao_fim_da_epoca: função opcional chamada como f(epoca, erro) ao fim
-                de cada época (o main.py usa para mostrar o progresso, já
-                que esta pasta não imprime nada). A época começa em 1.
-
-        Devolve a lista com o erro (MSE) de cada época. O erro guardado é o
-        calculado ANTES do ajuste de pesos daquela época.
+        Devolve Ŷ, forma (N, n_saidas). Os neurônios ficam com os valores
+        (entradas, z, a) do último exemplo.
         """
         X = np.atleast_2d(np.asarray(X, dtype=float))
-        Y = np.asarray(Y, dtype=float)
-        if Y.ndim == 1:
-            # Vetor simples de saídas → uma coluna (caso de 1 neurônio de saída).
-            Y = Y.reshape(-1, 1)
-        if Y.shape != (X.shape[0], self.n_saidas):
+        if X.shape[1] != self.n_entradas:
             raise ValueError(
-                f"Y deveria ter forma ({X.shape[0]}, {self.n_saidas}), "
-                f"mas tem {Y.shape}."
+                f"A rede espera {self.n_entradas} entradas por amostra, "
+                f"mas recebeu {X.shape[1]}."
             )
+        return np.array([self._propagar(x) for x in X])
 
-        historico = []
-        for epoca in range(1, epocas + 1):
-            # 1. Propagação para frente: calcula a saída da rede.
-            Y_hat = self.forward(X)
+    def _propagar(self, x):
+        """Um exemplo: a saída de uma camada é a entrada da próxima."""
+        for camada in self.camadas:
+            x = camada.forward(x)
+        return x
 
-            # 2. Mede o erro.
-            erro = mse(Y, Y_hat)
-            historico.append(erro)
+    def retropropagar(self, y):
+        """Backpropagation do último exemplo passado pelo forward.
 
-            # 3. Derivada do erro em relação à saída: (2/N) · (ŷ − y).
-            dA = derivada_mse(Y, Y_hat)
+        Calcula o delta de todos os neurônios, da saída para a entrada.
+        Nenhum peso muda aqui: os deltas das ocultas usam os mesmos pesos
+        do forward (seção 1.8 do enunciado).
+        """
+        y = np.asarray(y, dtype=float).reshape(1, -1)
+        y_hat = np.array([[neuronio.a for neuronio in self.camadas[-1].neuronios]])
+        # Na saída, ∂E/∂ŷ = 2(ŷ − y) (MSE de um exemplo, N = 1).
+        dE_da = derivada_mse(y, y_hat)[0]
+        for camada in reversed(self.camadas):
+            dE_da = camada.backward(dE_da)
 
-            # 4. Backpropagation: da saída para a entrada. Cada camada calcula
-            #    seus gradientes e devolve o dA da camada anterior.
-            for camada in reversed(self.camadas):
-                dA = camada.backward(dA)
+    def atualizar(self, taxa):
+        """Atualiza pesos e vieses de todas as camadas (depois de todos os deltas)."""
+        for camada in self.camadas:
+            camada.atualizar(taxa)
 
-            # 5. Só depois de todos os gradientes prontos, ajusta os pesos.
-            for camada in self.camadas:
-                camada.atualizar(taxa)
+    def treinar_exemplo(self, x, y, taxa):
+        """Um passo do SGD: forward → deltas → atualização, para um exemplo."""
+        self.forward(x)
+        self.retropropagar(y)
+        self.atualizar(taxa)
 
-            if ao_fim_da_epoca is not None:
+    def treinar(self, X, Y, epocas, taxa, ao_fim_da_epoca=None):
+        """Atalho temporário para o main.py: treina com SGD (sem validação).
+
+        Devolve a lista com o MSE do treino de cada época.
+        """
+        from rede.treinamento import treinar
+
+        progresso = None
+        if ao_fim_da_epoca is not None:
+            def progresso(epoca, erro, _validacao):
                 ao_fim_da_epoca(epoca, erro)
-
-        return historico
+        return treinar(self, X, Y, epocas, taxa, ao_fim_da_epoca=progresso)["treino"]
 
     def prever(self, X):
-        """Saída contínua da rede (ŷ entre 0 e 1, vinda da sigmoid)."""
+        """Saída contínua da rede (ŷ), só com a propagação direta."""
         return self.forward(X)
 
     def classificar(self, X):
@@ -151,7 +140,10 @@ class RedeNeural:
             if i == ultima:
                 titulo = "Saída"
                 regra = "degrau" if self.n_saidas == 1 else "maior ŷ"
-                ativacao = f"{camada.nome_ativacao} no treino / {regra} na classificação"
+                if camada.nome_ativacao == "sigmoid":
+                    ativacao = f"sigmoid no treino / {regra} na classificação"
+                else:
+                    ativacao = f"{camada.nome_ativacao} — {regra} na classificação"
             else:
                 titulo = f"Oculta {i + 1}"
                 ativacao = camada.nome_ativacao
