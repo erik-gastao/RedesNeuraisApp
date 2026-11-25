@@ -47,10 +47,22 @@ class TesteGraficoDoErro(unittest.TestCase):
         grafico_do_erro([0.3, 0.1], self.pasta / "erro.png", mostrar=False)
         self.assertEqual(plt.get_fignums(), [])
 
+    def test_curva_de_validacao(self):
+        import matplotlib.pyplot as plt
+        figuras = []
+        fechar = plt.close
+        with patch.object(plt, "close", side_effect=lambda f=None: (figuras.append(f), fechar(f))):
+            grafico_do_erro([0.3, 0.2, 0.1], self.pasta / "erro.png", mostrar=False,
+                            historico_validacao=[0.35, 0.25, 0.2])
+        eixo = figuras[0].axes[0]
+        self.assertEqual(len(eixo.get_lines()), 2)
+        self.assertEqual([t.get_text() for t in eixo.get_legend().get_texts()],
+                         ["treino", "validação"])
+
     def test_opcao_do_menu_salva_o_grafico(self):
         with patch.object(main, "PASTA_DE_GRAFICOS", self.pasta):
             saida = executar([
-                "s", "2", "1", "4", "sigmoid", "1", "s", "42", XOR, "0.5", "200",
+                "s", "2", "1", "4", "sigmoid", "1", "", "s", "42", XOR, "n", "0.5", "200",
                 "2", "100",   # treinar mais: o gráfico junta as 300 épocas
                 "4",
                 "0",
@@ -67,7 +79,7 @@ class TesteSemMatplotlib(unittest.TestCase):
     def test_menu_avisa_e_continua(self):
         with patch.object(main, "grafico_do_erro", side_effect=ImportError):
             saida = executar([
-                "s", "2", "0", "1", "s", "1", XOR, "", "10", "4", "0",
+                "s", "2", "0", "1", "", "s", "1", XOR, "n", "", "10", "4", "0",
             ])
         self.assertIn("pip install matplotlib", saida)
         self.assertTrue(saida.rstrip().endswith("Até mais!"))

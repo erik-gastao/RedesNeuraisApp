@@ -98,19 +98,6 @@ class RedeNeural:
         self.retropropagar(y)
         self.atualizar(taxa)
 
-    def treinar(self, X, Y, epocas, taxa, ao_fim_da_epoca=None):
-        """Atalho temporário para o main.py: treina com SGD (sem validação).
-
-        Devolve a lista com o MSE do treino de cada época.
-        """
-        from rede.treinamento import treinar
-
-        progresso = None
-        if ao_fim_da_epoca is not None:
-            def progresso(epoca, erro, _validacao):
-                ao_fim_da_epoca(epoca, erro)
-        return treinar(self, X, Y, epocas, taxa, ao_fim_da_epoca=progresso)["treino"]
-
     def prever(self, X):
         """Saída contínua da rede (ŷ), só com a propagação direta."""
         return self.forward(X)

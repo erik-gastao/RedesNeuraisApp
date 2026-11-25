@@ -1,5 +1,5 @@
 """Funções para preparar a base de dados: listar e carregar CSVs,
-normalizar (inteira ou por lotes) e desnormalizar, separar treino/teste
+normalizar as entradas (inteira ou por lotes), separar treino/validação/teste
 e medir a acurácia.
 
 Este arquivo não faz input() nem print(): problemas viram exceções com
@@ -196,20 +196,11 @@ def aplicar_normalizacao(X, minimos, maximos):
     return (X - minimos) / _amplitude(minimos, maximos)
 
 
-def desnormalizar(X_norm, minimos, maximos):
-    """Desfaz a normalização: x = x_norm · (máximo − mínimo) + mínimo.
-
-    Usada nas saídas: a rede treina e prevê Y na escala [0, 1], e esta
-    função devolve ŷ na escala original da base para mostrar ao usuário.
-    """
-    return X_norm * _amplitude(minimos, maximos) + minimos
-
-
 def _amplitude(minimos, maximos):
     """máximo − mínimo de cada coluna, trocando 0 por 1.
 
     Coluna constante (máximo = mínimo): evita divisão por zero. Dividindo
-    por 1, a coluna normalizada fica 0, e desnormalizar a devolve inteira.
+    por 1, a coluna normalizada fica 0.
     """
     amplitude = maximos - minimos
     return np.where(amplitude == 0, 1.0, amplitude)
@@ -245,33 +236,6 @@ def normalizar_por_lotes(X, tamanho_lote):
     for inicio, fim in zip(inicios, fins):
         X_norm[inicio:fim], _, _ = normalizar(X[inicio:fim])
     return X_norm
-
-
-def separar_treino_teste(X, Y, proporcao_teste=0.2, seed=None):
-    """Embaralha as amostras e separa uma parte para teste.
-
-    Devolve (X_treino, Y_treino, X_teste, Y_teste, separou).
-
-    O teste usa amostras que a rede não viu no treino: mede se ela aprendeu
-    o padrão em vez de decorar a base. Embaralhar é essencial em bases
-    ordenadas por classe (como a Iris): sem isso o teste teria uma classe só.
-
-    Se a base tiver menos de 10 linhas (XOR, AND), não separa: treino e
-    teste são a base inteira e `separou` vem False, para o main.py avisar
-    o usuário.
-    """
-    N = X.shape[0]
-    if N < MINIMO_PARA_SEPARAR:
-        return X, Y, X, Y, False
-
-    # Embaralha os índices das linhas (X e Y continuam alinhados).
-    gerador = np.random.default_rng(seed)
-    indices = gerador.permutation(N)
-
-    n_teste = max(1, round(N * proporcao_teste))
-    indices_teste = indices[:n_teste]
-    indices_treino = indices[n_teste:]
-    return X[indices_treino], Y[indices_treino], X[indices_teste], Y[indices_teste], True
 
 
 def separar_treino_validacao_teste(X, Y, percentuais=(70, 15, 15), seed=None):

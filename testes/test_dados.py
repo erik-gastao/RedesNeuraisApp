@@ -12,7 +12,6 @@ import numpy as np
 from dados import (
     acuracia,
     aplicar_normalizacao,
-    desnormalizar,
     carregar_csv,
     listar_bases,
     normalizar,
@@ -218,24 +217,6 @@ class TesteNormalizarPorLotes(unittest.TestCase):
     def test_lote_menor_que_dois_e_erro(self):
         with self.assertRaises(ValueError):
             normalizar_por_lotes(np.zeros((4, 1)), 1)
-
-
-class TesteDesnormalizar(unittest.TestCase):
-
-    def test_desfaz_a_normalizacao(self):
-        Y = np.array([[100.0], [125.0], [150.0]])
-        Y_norm, minimos, maximos = normalizar(Y)
-        np.testing.assert_allclose(desnormalizar(Y_norm, minimos, maximos), Y)
-
-    def test_coluna_constante_volta_inteira(self):
-        Y = np.array([[7.0], [7.0]])
-        Y_norm, minimos, maximos = normalizar(Y)
-        np.testing.assert_allclose(desnormalizar(Y_norm, minimos, maximos), Y)
-
-    def test_zero_e_um_nao_mudam(self):
-        Y = np.array([[0.0, 1.0], [1.0, 0.0]])
-        Y_norm, minimos, maximos = normalizar(Y)
-        np.testing.assert_array_equal(Y_norm, Y)
 
 
 class TesteSepararTresConjuntos(unittest.TestCase):

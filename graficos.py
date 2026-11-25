@@ -9,10 +9,13 @@ import warnings
 from pathlib import Path
 
 
-def grafico_do_erro(historico, caminho, titulo="Erro por época", mostrar=True):
+def grafico_do_erro(historico, caminho, titulo="Erro por época", mostrar=True,
+                    historico_validacao=None):
     """Desenha a curva do erro (MSE) ao longo das épocas.
 
-    historico: lista com o erro de cada época (o que RedeNeural.treinar devolve)
+    historico: lista com o erro do treino em cada época
+    historico_validacao: lista com o erro da validação em cada época
+               (opcional); quando dada, vira uma segunda curva
     caminho:   arquivo .png onde a figura é salva (a pasta é criada se faltar)
     titulo:    texto no topo do gráfico
     mostrar:   se True, também abre a janela do gráfico; o programa continua
@@ -29,7 +32,12 @@ def grafico_do_erro(historico, caminho, titulo="Erro por época", mostrar=True):
     epocas = range(1, len(historico) + 1)
 
     figura, eixo = plt.subplots(figsize=(8, 4.5))
-    eixo.plot(epocas, historico, color="tab:blue", linewidth=2)
+    eixo.plot(epocas, historico, color="tab:blue", linewidth=2, label="treino")
+    if historico_validacao:
+        # Validação subindo enquanto o treino cai = a rede está decorando.
+        eixo.plot(epocas, historico_validacao, color="tab:orange", linewidth=2,
+                  label="validação")
+        eixo.legend()
     eixo.set_title(titulo)
     eixo.set_xlabel("Época")
     eixo.set_ylabel("Erro (MSE)")
