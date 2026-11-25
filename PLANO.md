@@ -1,5 +1,14 @@
 # Plano — Construtor de Redes Neurais (versão inicial)
 
+> **Atualização (2026-11-25):** o enunciado do Trabalho Prático 02 substitui
+> partes deste plano. Valem agora: entidade Neurônio com delta, ativação
+> Linear, pesos iniciais Xavier/He, treino **SGD** (atualiza a cada exemplo),
+> divisão **treino/validação/teste** com percentuais configuráveis,
+> normalização **opcional e só das entradas** (as saídas não são
+> normalizadas), MSE de validação por época e salvar/carregar a rede em JSON.
+> O README descreve o comportamento atual; este documento fica como histórico
+> das decisões iniciais.
+
 Documento de especificação para implementar o projeto. Quem for executar
 (pessoa ou outro modelo de IA) deve seguir este plano na ordem das etapas.
 
