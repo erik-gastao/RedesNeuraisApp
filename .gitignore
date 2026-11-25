@@ -5,7 +5,12 @@ venv/
 env/
 .vscode/
 .idea/
-*.png
+exportacoes/
 graficos/
 .env
 .claude/settings.local.json
+
+# graphify (ferramenta local, nao vai pro repo)
+graphify-out/
+docs/superpowers/
+.superpowers/

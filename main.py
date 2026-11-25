@@ -29,7 +29,7 @@ from rede.rede_neural import RedeNeural
 
 # Pastas cujos arquivos aparecem no menu de bases (ficam ao lado deste arquivo).
 PASTA_DO_PROJETO = Path(__file__).resolve().parent
-PASTAS_DE_BASES = [PASTA_DO_PROJETO / "bases", PASTA_DO_PROJETO / "Dataset"]
+PASTAS_DE_BASES = [PASTA_DO_PROJETO / "bases", PASTA_DO_PROJETO / "Datasets"]
 
 # Pasta onde os gráficos do erro são salvos.
 PASTA_DE_GRAFICOS = PASTA_DO_PROJETO / "graficos"
@@ -185,6 +185,9 @@ def carregar_base(rede):
             return None
 
         if texto.isdigit():
+            if not bases:
+                print("  Nenhuma base na lista: digite o caminho de um arquivo.")
+                continue
             if not 1 <= int(texto) <= len(bases):
                 print(f"  Opção inválida: escolha um número de 1 a {len(bases)}, "
                       "ou digite o caminho de um arquivo.")
@@ -199,13 +202,15 @@ def carregar_base(rede):
             print(f"  Não foi possível carregar a base: {erro}")
             continue
 
-        # Colunas da base = entradas + saídas da rede.
+        # Colunas do arquivo = entradas + saídas. Com a classe em texto
+        # (Iris), a saída é 1 coluna no arquivo, mesmo virando várias em Y.
         if X.shape[1] != rede.n_entradas:
+            colunas_saida = 1 if classes is not None else rede.n_saidas
             print(
                 f"  Base incompatível: a rede tem {rede.n_entradas} entrada(s) e "
                 f"{rede.n_saidas} saída(s), então a base precisa de "
-                f"{rede.n_entradas + rede.n_saidas} colunas, mas tem "
-                f"{X.shape[1] + Y.shape[1]}."
+                f"{rede.n_entradas + colunas_saida} colunas, mas tem "
+                f"{X.shape[1] + colunas_saida}."
             )
             continue
 

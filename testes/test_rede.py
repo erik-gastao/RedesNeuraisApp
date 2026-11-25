@@ -32,7 +32,7 @@ from rede.rede_neural import RedeNeural
 
 # Pasta bases/ na raiz do projeto (este arquivo fica em testes/).
 PASTA_BASES = Path(__file__).resolve().parent.parent / "bases"
-PASTA_DATASET = Path(__file__).resolve().parent.parent / "Dataset"
+PASTA_DATASET = Path(__file__).resolve().parent.parent / "Datasets"
 
 
 class TesteAtivacoes(unittest.TestCase):

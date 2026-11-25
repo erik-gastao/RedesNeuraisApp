@@ -124,8 +124,9 @@ class TesteSeletorDeBase(unittest.TestCase):
         saida = executar(["s", "2", "0", "1", "s", "1", ""])
         self.assertIn("1) and.csv  (bases/)", saida)
         self.assertIn("2) xor.csv  (bases/)", saida)
-        self.assertIn("3) bezdekIris.data  (Dataset/)", saida)
-        self.assertIn("4) iris.data  (Dataset/)", saida)
+        self.assertIn("3) bezdekIris.data  (Datasets/)", saida)
+        self.assertIn("4) dataset.csv  (Datasets/)", saida)
+        self.assertIn("5) iris.data  (Datasets/)", saida)
 
     def test_escolher_xor_pelo_numero(self):
         saida = executar([
@@ -134,7 +135,7 @@ class TesteSeletorDeBase(unittest.TestCase):
             "2",   # xor.csv
             "0.5", "10000", "0",
         ])
-        self.assertIn("Opção inválida: escolha um número de 1 a 4", saida)
+        self.assertIn("Opção inválida: escolha um número de 1 a 5", saida)
         self.assertIn("Acurácia: 100,00% (4/4)", saida)
 
     def test_iris_ponta_a_ponta(self):
@@ -156,6 +157,20 @@ class TesteSeletorDeBase(unittest.TestCase):
         self.assertIn("classe: Iris-virginica", saida)
         acuracia = float(saida.split("Acurácia: ")[1].split("%")[0].replace(",", "."))
         self.assertGreaterEqual(acuracia, 90)
+
+    def test_iris_incompativel_conta_as_colunas_do_arquivo(self):
+        # Rede 3 → 3: o arquivo da Iris tem 5 colunas (4 medidas + classe em
+        # texto). A classe é 1 coluna no arquivo, mesmo virando 3 saídas.
+        saida = executar(["s", "3", "0", "3", "s", "1", "3", ""])
+        self.assertIn("Base incompatível", saida)
+        self.assertIn("precisa de 4 colunas, mas tem 5", saida)
+
+    def test_sem_bases_na_lista_numero_pede_caminho(self):
+        with tempfile.TemporaryDirectory() as vazia:
+            with patch.object(main, "PASTAS_DE_BASES", [Path(vazia)]):
+                saida = executar(["s", "2", "0", "1", "s", "1", "1", ""])
+        self.assertNotIn("de 1 a 0", saida)
+        self.assertIn("Nenhuma base na lista: digite o caminho de um arquivo.", saida)
 
     def test_iris_com_numero_errado_de_saidas(self):
         saida = executar(["s", "4", "0", "1", "s", "1", "3", ""])

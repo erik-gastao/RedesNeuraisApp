@@ -21,7 +21,7 @@ from dados import (
 )
 
 PASTA_BASES = Path(__file__).resolve().parent.parent / "bases"
-PASTA_DATASET = Path(__file__).resolve().parent.parent / "Dataset"
+PASTA_DATASET = Path(__file__).resolve().parent.parent / "Datasets"
 
 
 class TesteCarregarCsv(unittest.TestCase):
@@ -165,7 +165,7 @@ class TesteListarBases(unittest.TestCase):
     def test_pastas_do_projeto(self):
         nomes = [arquivo.name for arquivo in listar_bases([PASTA_BASES, PASTA_DATASET])]
         self.assertEqual(
-            nomes, ["and.csv", "xor.csv", "bezdekIris.data", "iris.data"]
+            nomes, ["and.csv", "xor.csv", "bezdekIris.data", "dataset.csv", "iris.data"]
         )
 
 
