@@ -69,6 +69,7 @@ class Experimento:
         self.X_validacao = self.Y_validacao = self.X_validacao_original = None
         self.X_teste = self.Y_teste = self.X_teste_original = None
         self.normalizacao = None
+        self.tamanho_lote = None
         self.historico = {"treino": [], "validacao": []}
 
     @classmethod
@@ -119,6 +120,7 @@ class Experimento:
         self.X_teste = self.X_teste_original = X_te
         self.Y_teste = Y_te
         self.normalizacao = None
+        self.tamanho_lote = None
 
     def normalizar_entradas(self, tamanho_lote=None):
         """Min-max das entradas com o mínimo e o máximo do treino (seção 1.9).
@@ -131,8 +133,10 @@ class Experimento:
         X_treino, minimos, maximos = normalizar(self.X_treino_original)
         self.normalizacao = {"funcao": "min-max", "minimos": minimos.tolist(),
                              "maximos": maximos.tolist()}
+        self.tamanho_lote = None
         if tamanho_lote is not None and tamanho_lote < len(X_treino):
             X_treino = normalizar_por_lotes(self.X_treino_original, tamanho_lote)
+            self.tamanho_lote = tamanho_lote
         self.X_treino = X_treino
         self.X_teste = aplicar_normalizacao(self.X_teste_original, minimos, maximos)
         if self.X_validacao_original is not None:

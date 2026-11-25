@@ -439,6 +439,19 @@ def passos_previsao(rede, x_normalizado, nivel) -> list[Passo]
 - Resultado tem que ser **idêntico** ao de `treinamento.treinar` com a mesma
   semente (testado).
 - Nada é recalculado na interface: todo número de passo vem dessas cópias.
+- **Feito na etapa 2.** Detalhes que ficaram decididos:
+  - o gravador gera os passos direto no nível pedido (`nivel`); não há
+    função de agrupar depois;
+  - cada `Passo` tem o campo `pesos` ([(W, b)] valendo naquele passo: os de
+    antes do exemplo, e os novos camada a camada nos passos de ajuste), e
+    `estado_em(passos, i)` junta ativações e deltas do exemplo até o passo;
+  - camada 0 = entrada; índices de neurônio começam em 0 (as fórmulas
+    mostram a partir de 1: w₁, z₂...);
+  - o ∂E/∂a das ocultas mostrado na fórmula é `Σ δ·w` com os pesos de antes,
+    a mesma conta de `Camada.backward`; o teste confere que `δ = ∂E/∂a · f'(z)`
+    bate com o δ real do neurônio;
+  - medido: Iris (200 épocas) e `dataset.csv` (1000 épocas), 5 épocas
+    detalhadas no nível ligação ≈ 1.060 passos; gravar leva ~5 s e ~20 s.
 
 ### 10.3 Desempenho
 
