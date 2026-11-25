@@ -297,6 +297,7 @@ confere ŷ, MSE, deltas e gradientes.
 ```
 RedesNeuraisApp/
 ├── main.py              # menu e perguntas (único arquivo com input/print)
+├── experimento.py       # fluxo sem input/print: dividir, normalizar, treinar, avaliar, prever, salvar
 ├── dados.py             # carregar CSV, normalizar, dividir treino/validação/teste, acurácia
 ├── persistencia.py      # salvar e carregar a rede em JSON
 ├── graficos.py          # gráfico do erro por época (matplotlib, opcional)
@@ -314,6 +315,7 @@ RedesNeuraisApp/
 │   ├── test_rede.py         # ativações, Xavier/He, neurônio, slides da aula, gradiente, SGD
 │   ├── test_dados.py        # CSV, classes em texto, normalização, divisão, acurácia
 │   ├── test_persistencia.py # salvar/carregar JSON
+│   ├── test_experimento.py  # fluxo completo sem terminal
 │   ├── test_main.py         # programa inteiro com respostas simuladas
 │   └── test_graficos.py     # gráfico do erro
 ├── executar.bat         # abre o programa com dois cliques (Windows)
@@ -331,7 +333,7 @@ Com dois cliques em `testar.bat`, ou pelo terminal nesta pasta:
 python -m unittest discover testes
 ```
 
-São 166 testes e levam cerca de 30 segundos. Os mais importantes:
+São 187 testes e levam cerca de 40 segundos. Os mais importantes:
 
 - `TesteGradiente` (`testes/test_rede.py`): para cada peso de cada
   neurônio, compara o gradiente da retropropagação (`δ · x`) com

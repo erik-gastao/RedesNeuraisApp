@@ -393,27 +393,33 @@ RedesNeuraisApp/
     └── test_interface.py    # fumaça com SDL_VIDEODRIVER=dummy
 ```
 
-### 10.1 `experimento.py` — evitar duplicar o `main.py`
+### 10.1 `experimento.py` — evitar duplicar o `main.py` (feito na etapa 1)
 
-Extrair do `main.py` a sequência carregar → dividir → normalizar (opcional)
-→ montar → treinar → avaliar para uma classe sem `input`/`print`:
+A sequência carregar → dividir → normalizar (opcional) → treinar → avaliar
+→ prever/salvar virou uma classe sem `input`/`print`. Ela funciona em fases,
+porque o terminal pergunta a divisão e a normalização depois de carregar a
+base (e valida os percentuais contra ela):
 
 ```python
-class Experimento:
-    def __init__(self, caminho_base, ocultas, ativacao_saida, usar_bias, seed,
-                 n_saidas=1, percentuais=(70, 15, 15), normalizar=True, tamanho_lote=None): ...
-    def treinar(self, epocas, taxa, ao_fim_da_epoca=None) -> dict: ...  # {"treino": [...], "validacao": [...]}
-    def avaliar(self) -> dict: ...        # MSE treino/validação/teste, acurácia (classificação), linhas da tabela
-    def prever_entrada(self, valores) -> tuple: ...   # normaliza (se houver) e devolve (ŷ, classe ou None)
-    def salvar(self, caminho): ...        # persistencia.salvar_rede
-    @classmethod
-    def carregar(cls, caminho): ...       # rede + normalização + classes, sem base (modo previsão)
-    def reiniciar(self): ...
+exp = Experimento(rede, X, Y, classes, nome_base, seed)   # ValueError se a base não bate com a rede
+exp.dividir(percentuais=(70, 15, 15))                     # ValueError se inválidos; base < 10 linhas não divide
+exp.normalizar_entradas(tamanho_lote=None)                # opcional; min-max do treino, só entradas
+exp.treinar(epocas, taxa, ao_fim_da_epoca=None) -> dict   # SGD; acumula exp.historico
+exp.avaliar() -> dict          # mse_treino/validacao/teste, classificacao, acuracia, acertos, linhas
+exp.prever_entrada(valores) -> (ŷ, classe ou None)        # aplica a normalização salva
+exp.salvar(caminho)            # persistencia.salvar_rede
+exp.reiniciar()                # pesos iniciais (mesma semente) e histórico zerado
+
+Experimento.da_base(caminho, ocultas, ativacao_saida, usar_bias, seed, n_saidas=1,
+                    percentuais=(70, 15, 15), normalizar=True, tamanho_lote=None)  # tudo de uma vez (hub)
+Experimento.carregar(caminho)  # rede salva, sem base: modo previsão
 ```
 
-`n_entradas` sai da base; `n_saidas` é o nº de classes quando a classe vem
-em texto. O `main.py` passa a usar `Experimento` sem mudar as perguntas nem
-as mensagens: `test_main.py` deve continuar passando sem mudança.
+Atributos lidos pela interface: `rede`, `classes`, `classificacao`,
+`separou`, `X_treino`/`Y_treino`, `X_validacao`/`Y_validacao`,
+`X_teste`/`Y_teste`, `X_*_original`, `normalizacao`, `historico`,
+`nome_base`, `seed`. O `main.py` usa `Experimento` com as mesmas perguntas e
+mensagens; `test_main.py` passou sem mudança.
 
 ### 10.2 Gravador
 

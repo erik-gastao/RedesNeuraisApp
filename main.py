@@ -1,8 +1,9 @@
 """Construtor de Redes Neurais — programa de terminal.
 
 Este é o único arquivo que conversa com o usuário (input e print).
-A rede em si fica na pasta rede/, a preparação da base em dados.py e o
-salvar/carregar em persistencia.py.
+As contas (dividir, normalizar, treinar, avaliar, prever, salvar) ficam
+em experimento.py, que a interface gráfica também usa; a rede em si fica
+na pasta rede/.
 
 Rodar com:  python main.py
 """
@@ -14,22 +15,11 @@ from pathlib import Path
 
 import numpy as np
 
-from dados import (
-    acuracia,
-    aplicar_normalizacao,
-    carregar_csv,
-    e_classificacao,
-    listar_bases,
-    normalizar,
-    normalizar_por_lotes,
-    separar_treino_validacao_teste,
-)
+from dados import carregar_csv, listar_bases
+from experimento import PERCENTUAIS_PADRAO, Experimento, nome_da_classe
 from graficos import grafico_do_erro
-from persistencia import carregar_rede, salvar_rede
 from rede.ativacoes import ATIVACOES
-from rede.perda import mse
 from rede.rede_neural import RedeNeural
-from rede.treinamento import treinar as treinar_rede
 
 # Pastas cujos arquivos aparecem no menu de bases (ficam ao lado deste arquivo).
 PASTA_DO_PROJETO = Path(__file__).resolve().parent
@@ -45,7 +35,6 @@ PASTA_DE_REDES = PASTA_DO_PROJETO / "redes"
 MAXIMO_LINHAS_TABELA = 20
 
 # Valores usados quando o usuário só aperta Enter.
-PERCENTUAIS_PADRAO = (70, 15, 15)
 TAXA_PADRAO = 0.1
 EPOCAS_PADRAO = 1000
 
@@ -269,7 +258,7 @@ def avisar_alcance_da_saida(Y, ativacao_saida):
         )
 
 
-def perguntar_divisao(X, Y, semente):
+def perguntar_divisao(experimento):
     """Pergunta os percentuais e divide em treino, validação e teste.
 
     Aceita "70/15/15", "70 15 15" ou "70,15,15". Com "/", ";" ou espaços
@@ -292,27 +281,26 @@ def perguntar_divisao(X, Y, semente):
                 print("  Valor inválido: digite 3 números somando 100 (ex.: 70/15/15).")
                 continue
         try:
-            return separar_treino_validacao_teste(X, Y, percentuais, seed=semente)
+            experimento.dividir(percentuais)
+            return
         except ValueError as erro:
             print(f"  Valor inválido: {erro}")
 
 
-def perguntar_lotes(X_treino_original, X_treino):
+def perguntar_lotes(N):
     """Pergunta se as entradas do treino devem ser normalizadas por lotes.
 
-    Enter mantém a normalização da base de treino inteira (X_treino, já
-    pronto), que é o padrão do enunciado. Com um tamanho menor, cada lote de
-    registros é normalizado com o mínimo e o máximo dele mesmo (ver
+    Enter mantém a normalização do treino inteiro, que é o padrão do
+    enunciado (devolve None). Com um tamanho menor, cada lote de registros é
+    normalizado com o mínimo e o máximo dele mesmo (ver
     dados.normalizar_por_lotes) — opção extra deste projeto.
-    Devolve o X do treino que a rede vai usar.
     """
-    N = len(X_treino_original)
     tamanho = perguntar_inteiro(
         f"Tamanho do lote para normalizar (2 a {N}, Enter = treino inteiro, o padrão): ",
         2, padrao=N, maximo=N,
     )
     if tamanho == N:
-        return X_treino
+        return None
     # Arredonda para cima; uma sobra de 1 registro entra no lote anterior.
     n_lotes = -(-N // tamanho) - (1 if N % tamanho == 1 else 0)
     print(
@@ -324,16 +312,13 @@ def perguntar_lotes(X_treino_original, X_treino):
         "  Atenção: isso foge do padrão do enunciado (uma escala só, calculada "
         "no treino e aplicada aos três conjuntos)."
     )
-    return normalizar_por_lotes(X_treino_original, tamanho)
+    return tamanho
 
 
 # ----------------------------------------------------------------- treino
 
-def treinar(rede, conjuntos, epocas, taxa, semente):
-    """Treina com SGD mostrando o erro a cada ~10% das épocas.
-
-    Devolve {"treino": [...], "validacao": [...]} com o MSE de cada época.
-    """
+def treinar(experimento, epocas, taxa):
+    """Treina com SGD mostrando o erro a cada ~10% das épocas."""
     intervalo = max(1, epocas // 10)
     largura = len(str(epocas))
 
@@ -348,11 +333,7 @@ def treinar(rede, conjuntos, epocas, taxa, semente):
 
     print()
     print("Treinando...")
-    return treinar_rede(
-        rede, conjuntos["X_treino"], conjuntos["Y_treino"], epocas, taxa,
-        X_validacao=conjuntos["X_validacao"], Y_validacao=conjuntos["Y_validacao"],
-        seed=semente, ao_fim_da_epoca=mostrar_progresso,
-    )
+    experimento.treinar(epocas, taxa, ao_fim_da_epoca=mostrar_progresso)
 
 
 # -------------------------------------------------------------- avaliação
@@ -367,66 +348,55 @@ def formatar_porcentagem(fracao):
     return f"{fracao * 100:.2f}%".replace(".", ",")
 
 
-def formatar_saida(valores, classes):
-    """Saída 0/1 → texto. Com nomes de classes, mostra o nome da classe
-    marcada com 1 (ex.: 'Iris-setosa'); sem nomes, mostra os números."""
-    if classes is None:
-        return formatar_valores(valores)
-    return classes[int(np.argmax(valores))]
-
-
-def avaliar(rede, conjuntos, titulo, classes, classificacao):
+def avaliar(experimento, titulo):
     """Mostra o MSE dos três conjuntos e a tabela do conjunto de teste.
 
     Classificação: acurácia e colunas entrada | esperado | ŷ | classe | ok?.
     Regressão: colunas entrada | esperado | ŷ | erro (ŷ − esperado).
     """
-    partes = [f"MSE treino: {mse(conjuntos['Y_treino'], rede.prever(conjuntos['X_treino'])):.4f}"]
-    if conjuntos["X_validacao"] is not None and len(conjuntos["X_validacao"]):
-        erro = mse(conjuntos["Y_validacao"], rede.prever(conjuntos["X_validacao"]))
-        partes.append(f"validação: {erro:.4f}")
+    resultado = experimento.avaliar()
+    partes = [f"MSE treino: {resultado['mse_treino']:.4f}"]
+    if resultado["mse_validacao"] is not None:
+        partes.append(f"validação: {resultado['mse_validacao']:.4f}")
 
-    X_teste, Y_teste = conjuntos["X_teste"], conjuntos["Y_teste"]
     print()
     print(f"Avaliação ({titulo}):")
-    if len(Y_teste) == 0:
+    if resultado["mse_teste"] is None:
         print("  " + " | ".join(partes))
         print("  Sem conjunto de teste (0%).")
         return
-
-    Y_hat = rede.prever(X_teste)
-    partes.append(f"teste: {mse(Y_teste, Y_hat):.4f}")
+    partes.append(f"teste: {resultado['mse_teste']:.4f}")
     print("  " + " | ".join(partes))
 
-    if classificacao:
-        classificado = rede.classificar(X_teste)
-        acertou = np.all(classificado == Y_teste, axis=1)
+    classes = experimento.classes
+    total = len(resultado["linhas"])
+    if resultado["classificacao"]:
         print(
-            f"  Acurácia: {formatar_porcentagem(acuracia(Y_teste, classificado))} "
-            f"({int(acertou.sum())}/{len(acertou)})"
+            f"  Acurácia: {formatar_porcentagem(resultado['acuracia'])} "
+            f"({resultado['acertos']}/{total})"
         )
         cabecalho = ("entrada", "esperado", "ŷ", "classe", "ok?")
     else:
         cabecalho = ("entrada", "esperado", "ŷ", "erro")
 
-    n_linhas = min(len(Y_teste), MAXIMO_LINHAS_TABELA)
+    n_linhas = min(total, MAXIMO_LINHAS_TABELA)
     linhas = [cabecalho]
-    for i in range(n_linhas):
-        y_hat = " ".join(f"{valor:.4f}" for valor in Y_hat[i])
-        if classificacao:
+    for linha in resultado["linhas"][:n_linhas]:
+        y_hat = " ".join(f"{valor:.4f}" for valor in linha["y_hat"])
+        if resultado["classificacao"]:
             linhas.append((
-                formatar_valores(conjuntos["X_teste_original"][i]),
-                formatar_saida(Y_teste[i], classes),
+                formatar_valores(linha["entrada"]),
+                nome_da_classe(linha["esperado"], classes),
                 y_hat,
-                formatar_saida(classificado[i], classes),
-                "sim" if acertou[i] else "NÃO",
+                nome_da_classe(linha["classificado"], classes),
+                "sim" if linha["acertou"] else "NÃO",
             ))
         else:
             linhas.append((
-                formatar_valores(conjuntos["X_teste_original"][i]),
-                formatar_valores(Y_teste[i]),
+                formatar_valores(linha["entrada"]),
+                formatar_valores(linha["esperado"]),
                 y_hat,
-                " ".join(f"{valor:+.4f}" for valor in Y_hat[i] - Y_teste[i]),
+                " ".join(f"{valor:+.4f}" for valor in linha["erro"]),
             ))
 
     # Largura de cada coluna = maior texto dela.
@@ -434,13 +404,13 @@ def avaliar(rede, conjuntos, titulo, classes, classificacao):
     print()
     for linha in linhas:
         print("  " + " | ".join(texto.ljust(larguras[c]) for c, texto in enumerate(linha)))
-    if len(Y_teste) > n_linhas:
-        print(f"  ... (mostrando {n_linhas} de {len(Y_teste)} amostras)")
+    if total > n_linhas:
+        print(f"  ... (mostrando {n_linhas} de {total} amostras)")
 
 
 # ------------------------------------------------------------- menu final
 
-def testar_entrada_digitada(rede, normalizacao, classes, mostrar_classe):
+def testar_entrada_digitada(experimento):
     """Previsão (seção 1.12): pede uma entrada, passa pela rede e mostra ŷ.
 
     Só faz a propagação direta (nenhum peso muda). Se o treino usou
@@ -449,16 +419,12 @@ def testar_entrada_digitada(rede, normalizacao, classes, mostrar_classe):
     """
     valores = [
         perguntar_float(f"  Valor da entrada {i}: ")
-        for i in range(1, rede.n_entradas + 1)
+        for i in range(1, experimento.rede.n_entradas + 1)
     ]
-    x = np.array([valores])
-    if normalizacao is not None:
-        x = aplicar_normalizacao(x, np.array(normalizacao["minimos"]),
-                                 np.array(normalizacao["maximos"]))
-    y_hat = rede.prever(x)[0]
+    y_hat, classe = experimento.prever_entrada(valores)
     linha = f"  ŷ = {' '.join(f'{valor:.4f}' for valor in y_hat)}"
-    if mostrar_classe:
-        linha += f"  →  classe: {formatar_saida(rede.classificar(x)[0], classes)}"
+    if classe is not None:
+        linha += f"  →  classe: {classe}"
     print(linha)
 
 
@@ -479,12 +445,12 @@ def mostrar_grafico(historico, nome_da_base, taxa):
     print(f"  Gráfico salvo em: {caminho}")
 
 
-def salvar(rede, normalizacao, classes, nome_da_base):
+def salvar(experimento):
     """Pergunta o arquivo e salva a rede em JSON (seção 1.11)."""
-    padrao = PASTA_DE_REDES / f"{Path(nome_da_base).stem}.json"
+    padrao = PASTA_DE_REDES / f"{Path(experimento.nome_base).stem}.json"
     texto = input(f"Arquivo para salvar (Enter = {padrao}): ").strip().strip('"')
     try:
-        caminho = salvar_rede(texto or padrao, rede, normalizacao, classes)
+        caminho = experimento.salvar(texto or padrao)
     except OSError as erro:
         print(f"  Não foi possível salvar: {erro}")
         return
@@ -502,58 +468,43 @@ def sessao_da_rede():
     if base is None:
         return True
     X, Y, classes, nome_da_base = base
-    classificacao = e_classificacao(Y, classes)
+    experimento = Experimento(rede, X, Y, classes, nome_da_base, semente)
 
     # Divide primeiro, com os valores originais (a tabela mostra eles).
-    X_treino, Y_treino, X_validacao, Y_validacao, X_teste, Y_teste, separou = (
-        perguntar_divisao(X, Y, semente) if len(X) >= 10
-        else separar_treino_validacao_teste(X, Y, seed=semente)
-    )
-    if separou:
-        titulo = f"{len(Y_teste)} amostras de teste, não usadas no treino"
+    if len(X) >= 10:
+        perguntar_divisao(experimento)
+    else:
+        experimento.dividir()
+    if experimento.separou:
+        titulo = f"{len(experimento.Y_teste)} amostras de teste, não usadas no treino"
         print(
-            f"  Base separada: {len(Y_treino)} para treino, {len(Y_validacao)} para "
-            f"validação e {len(Y_teste)} para teste."
+            f"  Base separada: {len(experimento.Y_treino)} para treino, "
+            f"{len(experimento.Y_validacao)} para validação e "
+            f"{len(experimento.Y_teste)} para teste."
         )
     else:
         # Validação igual ao treino não acrescenta nada: fica sem validação.
         titulo = "base inteira"
-        X_validacao = Y_validacao = None
         print(
             "  Base pequena (menos de 10 amostras): não foi separada. "
             "O treino e o teste usam a base inteira."
         )
-    X_teste_original = X_teste
 
     # Normalização opcional, só das entradas. Mínimos e máximos vêm só do
     # treino e valem para validação, teste e entradas digitadas. As saídas
     # esperadas nunca são normalizadas.
-    normalizacao = None
     if perguntar_sn("Normalizar as entradas (min-max, escala do treino)? (s/n) "):
-        X_treino_original = X_treino
-        X_treino, minimos, maximos = normalizar(X_treino)
-        normalizacao = {"funcao": "min-max", "minimos": minimos.tolist(),
-                        "maximos": maximos.tolist()}
-        X_teste = aplicar_normalizacao(X_teste, minimos, maximos)
-        if X_validacao is not None:
-            X_validacao = aplicar_normalizacao(X_validacao, minimos, maximos)
-        if separou:
-            X_treino = perguntar_lotes(X_treino_original, X_treino)
-
-    conjuntos = {
-        "X_treino": X_treino, "Y_treino": Y_treino,
-        "X_validacao": X_validacao, "Y_validacao": Y_validacao,
-        "X_teste": X_teste, "Y_teste": Y_teste, "X_teste_original": X_teste_original,
-    }
+        tamanho_lote = perguntar_lotes(len(experimento.X_treino)) if experimento.separou else None
+        experimento.normalizar_entradas(tamanho_lote)
 
     taxa = perguntar_float(f"Taxa de aprendizado (η) (Enter = {TAXA_PADRAO}): ",
                            maior_que=0, padrao=TAXA_PADRAO)
     epocas = perguntar_inteiro(f"Número de épocas (Enter = {EPOCAS_PADRAO}): ",
                                1, padrao=EPOCAS_PADRAO)
 
-    # Erros de cada época, desde o início (o "treinar mais" continua as listas).
-    historico = treinar(rede, conjuntos, epocas, taxa, semente)
-    avaliar(rede, conjuntos, titulo, classes, classificacao)
+    # O experimento guarda os erros de cada época desde o início.
+    treinar(experimento, epocas, taxa)
+    avaliar(experimento, titulo)
 
     while True:
         print()
@@ -567,19 +518,17 @@ def sessao_da_rede():
         opcao = perguntar_opcao("Opção: ", ["1", "2", "3", "4", "5", "0"])
 
         if opcao == "1":
-            testar_entrada_digitada(rede, normalizacao, classes, classificacao)
+            testar_entrada_digitada(experimento)
         elif opcao == "2":
             mais = perguntar_inteiro("Quantas épocas a mais? ", 1)
-            novo = treinar(rede, conjuntos, mais, taxa, semente)
-            historico["treino"] += novo["treino"]
-            historico["validacao"] += novo["validacao"]
-            avaliar(rede, conjuntos, titulo, classes, classificacao)
+            treinar(experimento, mais, taxa)
+            avaliar(experimento, titulo)
         elif opcao == "3":
             return True
         elif opcao == "4":
-            mostrar_grafico(historico, nome_da_base, taxa)
+            mostrar_grafico(experimento.historico, experimento.nome_base, taxa)
         elif opcao == "5":
-            salvar(rede, normalizacao, classes, nome_da_base)
+            salvar(experimento)
         else:
             return False
 
@@ -594,7 +543,7 @@ def sessao_rede_salva():
         if texto == "":
             return True
         try:
-            rede, normalizacao, classes = carregar_rede(texto)
+            experimento = Experimento.carregar(texto)
         except (OSError, ValueError) as erro:
             print(f"  Não foi possível carregar a rede: {erro}")
             continue
@@ -602,11 +551,9 @@ def sessao_rede_salva():
 
     print()
     print("Rede carregada:")
-    mostrar_resumo(rede)
-    if normalizacao is not None:
+    mostrar_resumo(experimento.rede)
+    if experimento.normalizacao is not None:
         print("  As entradas digitadas serão normalizadas com a escala salva.")
-    # Sem a base, a classe aparece quando há nomes de classes ou saída sigmoid.
-    mostrar_classe = classes is not None or rede.ativacao_saida == "sigmoid"
 
     while True:
         print()
@@ -615,7 +562,7 @@ def sessao_rede_salva():
         print("  0) Sair")
         if perguntar_opcao("Opção: ", ["1", "0"]) == "0":
             return False
-        testar_entrada_digitada(rede, normalizacao, classes, mostrar_classe)
+        testar_entrada_digitada(experimento)
 
 
 def main():
