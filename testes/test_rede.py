@@ -21,12 +21,15 @@ from rede.ativacoes import (
     degrau,
     derivada_relu,
     derivada_sigmoid,
+    derivada_linear,
     derivada_tanh,
+    linear,
     maior_saida,
     relu,
     sigmoid,
     tanh,
 )
+from rede.inicializacao import pesos_iniciais
 from rede.perda import derivada_mse, mse
 from rede.rede_neural import RedeNeural
 
@@ -97,8 +100,39 @@ class TesteAtivacoes(unittest.TestCase):
             numerica = (funcao(z + eps) - funcao(z - eps)) / (2 * eps)
             np.testing.assert_allclose(derivada(z, funcao(z)), numerica, atol=1e-6, err_msg=nome)
 
-    def test_dicionario_tem_as_tres_ativacoes(self):
-        self.assertEqual(set(ATIVACOES), {"sigmoid", "relu", "tanh"})
+    def test_linear_e_identidade(self):
+        z = np.array([-2.0, 0.0, 3.0])
+        np.testing.assert_array_equal(linear(z), z)
+        np.testing.assert_array_equal(derivada_linear(z, linear(z)), [1.0, 1.0, 1.0])
+
+    def test_dicionario_tem_as_quatro_ativacoes(self):
+        self.assertEqual(set(ATIVACOES), {"sigmoid", "relu", "tanh", "linear"})
+
+
+class TesteInicializacao(unittest.TestCase):
+    """Pesos iniciais: Xavier/Glorot (sigmoid, tanh, linear) e He (ReLU)."""
+
+    def test_xavier_dentro_do_limite(self):
+        pesos = pesos_iniciais(4, 5, "tanh", np.random.default_rng(0))
+        self.assertEqual(pesos.shape, (5, 4))
+        self.assertTrue(np.all(np.abs(pesos) <= np.sqrt(6 / 9)))
+
+    def test_he_dentro_do_limite_e_maior_que_xavier(self):
+        # Com 1 entrada e 1000 neurônios: Xavier limita em √(6/1001) ≈ 0,077
+        # e He em √6 ≈ 2,45. A ReLU precisa sortear valores bem maiores.
+        pesos = pesos_iniciais(1, 1000, "relu", np.random.default_rng(0))
+        self.assertTrue(np.all(np.abs(pesos) <= np.sqrt(6)))
+        self.assertTrue(np.any(np.abs(pesos) > np.sqrt(6 / 1001)))
+
+    def test_sigmoid_e_linear_usam_xavier(self):
+        for nome in ("sigmoid", "linear"):
+            pesos = pesos_iniciais(1, 1000, nome, np.random.default_rng(0))
+            self.assertTrue(np.all(np.abs(pesos) <= np.sqrt(6 / 1001)), nome)
+
+    def test_mesma_seed_mesmos_pesos(self):
+        a = pesos_iniciais(3, 2, "relu", np.random.default_rng(7))
+        b = pesos_iniciais(3, 2, "relu", np.random.default_rng(7))
+        np.testing.assert_array_equal(a, b)
 
 
 class TesteFormas(unittest.TestCase):
@@ -159,7 +193,7 @@ class TesteFormas(unittest.TestCase):
 
     def test_ativacao_desconhecida_da_erro(self):
         with self.assertRaises(ValueError):
-            RedeNeural(2, [(3, "linear")], 1, usar_bias=True, seed=1)
+            RedeNeural(2, [(3, "degrau")], 1, usar_bias=True, seed=1)
 
     def test_classificar_devolve_so_zero_ou_um(self):
         X = np.array([[0, 0], [0, 1], [1, 0], [1, 1]])

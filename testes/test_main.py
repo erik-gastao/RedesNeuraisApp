@@ -70,7 +70,7 @@ class TesteFluxoCompleto(unittest.TestCase):
             "abc", "0", "-3", "2",  # entrada: texto, zero, negativo
             "-1", "1",              # ocultas negativo
             "", "2.5", "3",         # neurônios: vazio, decimal
-            "linear", "TANH",       # ativação inexistente; maiúscula é aceita
+            "degrau", "TANH",       # ativação inexistente; maiúscula é aceita
             "1",
             "x", "n",               # bias inválido
             "abc", "-5", "",        # semente inválida, negativa, Enter

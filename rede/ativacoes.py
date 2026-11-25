@@ -50,6 +50,23 @@ def derivada_tanh(z, a):
     return 1 - a ** 2
 
 
+# ----------------------------------------------------------------- linear
+
+def linear(z):
+    """Linear (identidade): f(z) = z. A saída não é limitada.
+
+    Usada na saída de problemas de regressão: como as saídas esperadas não
+    são normalizadas, a rede precisa conseguir produzir qualquer valor
+    (ex.: produtividade de 2500 kg/ha). É o neurônio ADALINE da aula.
+    """
+    return np.asarray(z, dtype=float)
+
+
+def derivada_linear(z, a):
+    """Derivada da linear: f'(z) = 1."""
+    return np.ones_like(np.asarray(z, dtype=float))
+
+
 # ----------------------------------------------------------------- degrau
 
 def degrau(z):
@@ -95,4 +112,5 @@ ATIVACOES = {
     "sigmoid": (sigmoid, derivada_sigmoid),
     "relu": (relu, derivada_relu),
     "tanh": (tanh, derivada_tanh),
+    "linear": (linear, derivada_linear),
 }
