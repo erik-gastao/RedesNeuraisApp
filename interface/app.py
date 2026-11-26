@@ -36,7 +36,12 @@ def tema(fonte):
         "label": {"font": letra(14), "misc": {"text_horiz_alignment": "left"},
                   "colours": {"normal_text": "#282828", "dark_bg": "#00000000"}},
         "button": {"font": letra(14)},
-        "text_entry_line": {"font": letra(14)},
+        # Campos numéricos com contraste alto: número branco em fundo preto.
+        "text_entry_line": {"font": letra(14), "colours": {
+            "dark_bg": "#000000", "normal_text": "#FFFFFF", "text_cursor": "#FFFFFF",
+            "selected_bg": "#2166AC", "selected_text": "#FFFFFF",
+            "normal_border": "#5A5A5A", "disabled_dark_bg": "#3A3A3A",
+            "disabled_text": "#9A9A9A"}},
         "drop_down_menu": {"font": letra(14)},
         "#titulo": {"font": letra(22, True)},
         "#secao": {"font": letra(14, True), "colours": {"normal_text": "#2166AC"}},
