@@ -12,8 +12,8 @@ import pygame_gui
 from interface.desenho_rede import texto
 from interface.gravador import gravar
 
-COR_FUNDO = (248, 248, 246)
-AZUL = (33, 102, 172)
+COR_FUNDO = (12, 12, 12)
+AZUL = (67, 147, 224)
 
 
 class TelaGravando:
@@ -72,12 +72,12 @@ class TelaGravando:
         total = self.parametros["epocas"]
         if self.erro:
             texto(superficie, f"Não foi possível gravar o treino: {self.erro}",
-                  (largura // 2, altura // 2), 16, cor=(215, 48, 39))
+                  (largura // 2, altura // 2), 16, cor=(255, 107, 94))
             return
         texto(superficie, f"Treinando e gravando os passos… época {self.epoca} de {total}",
               (largura // 2, altura // 2 - 40), 18)
         barra = pygame.Rect(largura // 2 - 300, altura // 2, 600, 22)
-        pygame.draw.rect(superficie, (225, 225, 225), barra, border_radius=4)
+        pygame.draw.rect(superficie, (60, 60, 60), barra, border_radius=4)
         cheio = barra.copy()
         cheio.width = int(barra.width * self.epoca / max(total, 1))
         pygame.draw.rect(superficie, AZUL, cheio, border_radius=4)

@@ -16,9 +16,9 @@ from dataclasses import dataclass
 import numpy as np
 
 BRANCO = (255, 255, 255)
-AZUL = (33, 102, 172)
+AZUL = (67, 147, 224)
 LARANJA = (230, 97, 1)
-CINZA_CLARO = (215, 215, 215)
+CINZA_CLARO = (120, 120, 120)
 VERDE = (26, 152, 80)
 VERMELHO = (215, 48, 39)
 

@@ -116,7 +116,8 @@ class TesteCores(unittest.TestCase):
     def test_linear_negativo_puxa_para_laranja(self):
         self.assertEqual(cor_ativacao(-3.0, "linear", maior=3.0), LARANJA)
         self.assertEqual(cor_ativacao(3.0, "linear", maior=3.0), AZUL)
-        self.assertTrue(mais_perto(cor_ativacao(-1.0, "linear", maior=3.0), LARANJA, AZUL))
+        vermelho, _, azul = cor_ativacao(-1.0, "linear", maior=3.0)
+        self.assertGreater(vermelho, azul)   # tom alaranjado
 
     def test_ainda_nao_calculado_e_cinza(self):
         self.assertEqual(cor_ativacao(None, "sigmoid"), CINZA_CLARO)

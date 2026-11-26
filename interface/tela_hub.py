@@ -31,7 +31,7 @@ PASTA_DO_PROJETO = Path(__file__).resolve().parent.parent
 PASTAS_DE_BASES = [PASTA_DO_PROJETO / "bases", PASTA_DO_PROJETO / "Datasets"]
 ESCOLHA = "Escolha uma base…"
 NOMES_NIVEIS = {"ligacao": "ligação", "neuronio": "neurônio", "camada": "camada"}
-COR_FUNDO = (248, 248, 246)
+COR_FUNDO = (12, 12, 12)
 ALTURA_LINHA = 40
 
 

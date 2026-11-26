@@ -14,20 +14,20 @@ import pygame_gui
 from interface.desenho_rede import COR_TEXTO, desenhar_rede, fonte, texto
 from interface.passos import estado_em
 
-COR_FUNDO = (248, 248, 246)
-COR_PAINEL = (255, 255, 255)
-COR_BORDA = (215, 215, 215)
+COR_FUNDO = (12, 12, 12)
+COR_PAINEL = (28, 28, 28)
+COR_BORDA = (70, 70, 70)
 COR_DESTAQUE = (255, 196, 0)
 LARGURA_PAINEL = 340
 VELOCIDADES = [0.25, 0.5, 1, 2, 4, 8, 16]
 PASSOS_POR_SEGUNDO = 2          # na velocidade 1x
 CORES_FASE = {
     "normalizacao": (150, 110, 200),
-    "forward": (33, 102, 172),
+    "forward": (67, 147, 224),
     "erro": (215, 48, 39),
     "retropropagacao": (230, 97, 1),
     "atualizacao": (26, 152, 80),
-    "exemplo": (180, 180, 180),
+    "exemplo": (110, 110, 110),
 }
 NOMES_FASE = {
     "normalizacao": "NORMALIZAÇÃO", "forward": "FORWARD", "erro": "ERRO",
@@ -383,7 +383,7 @@ class TelaPlayer:
                 y += 20
             y += 8
             for linha in quebrar(passo.texto, 14, largura_texto):
-                texto(superficie, linha, (margem, y), 14, cor=(90, 90, 90), ancora="topleft")
+                texto(superficie, linha, (margem, y), 14, cor=(175, 175, 175), ancora="topleft")
                 y += 19
 
         grafico = pygame.Rect(x + 12, painel.bottom - 190, LARGURA_PAINEL - 24, 170)
@@ -394,7 +394,7 @@ class TelaPlayer:
         resumos = self.gravacao.resumos
         treino = [r["erro_treino"] for r in resumos]
         validacao = [r["erro_validacao"] for r in resumos if r["erro_validacao"] is not None]
-        pygame.draw.rect(superficie, (250, 250, 250), area)
+        pygame.draw.rect(superficie, (18, 18, 18), area)
         pygame.draw.rect(superficie, COR_BORDA, area, 1)
         texto(superficie, "Erro (MSE) por época", (area.x + 6, area.y + 4), 13,
               ancora="topleft", negrito=True)
@@ -408,15 +408,15 @@ class TelaPlayer:
             y = base - (base - topo) * (valor / maior)
             return x, y
 
-        for serie, cor in ((treino, (33, 102, 172)), (validacao, (230, 97, 1))):
+        for serie, cor in ((treino, (67, 147, 224)), (validacao, (253, 141, 60))):
             if len(serie) > 1:
                 pygame.draw.lines(superficie, cor, False,
                                   [ponto(i, v, len(serie)) for i, v in enumerate(serie)], 2)
         texto(superficie, f"treino {treino[-1]:.4g}", (area.x + 8, base + 2), 12,
-              cor=(33, 102, 172), ancora="topleft")
+              cor=(67, 147, 224), ancora="topleft")
         if validacao:
             texto(superficie, f"validação {validacao[-1]:.4g}", (area.centerx, base + 2), 12,
-                  cor=(230, 97, 1), ancora="topleft")
+                  cor=(253, 141, 60), ancora="topleft")
         if passo and passo.epoca:
             x, _ = ponto(passo.epoca - 1, 0, len(treino))
             pygame.draw.line(superficie, COR_DESTAQUE, (x, topo), (x, base), 2)
@@ -424,7 +424,7 @@ class TelaPlayer:
     def _desenhar_barra(self, superficie):
         """Barra de tempo: uma faixa colorida por fase; clique/arraste pula."""
         barra = self._retangulo_barra()
-        pygame.draw.rect(superficie, (230, 230, 230), barra)
+        pygame.draw.rect(superficie, (45, 45, 45), barra)
         total = len(self.passos)
         if total == 0:
             return
@@ -441,6 +441,6 @@ class TelaPlayer:
                 texto(superficie, f"época {passo.epoca}", (x + 3, barra.y - 16), 11, ancora="topleft")
             anterior = passo.epoca
         x = barra.x + barra.width * (self.indice + 0.5) / total
-        pygame.draw.line(superficie, (0, 0, 0), (x, barra.y - 6), (x, barra.bottom + 6), 3)
+        pygame.draw.line(superficie, (255, 255, 255), (x, barra.y - 6), (x, barra.bottom + 6), 3)
         texto(superficie, f"passo {self.indice + 1} / {total}",
               (barra.right, barra.y - 16), 12, ancora="topright")

@@ -34,19 +34,19 @@ def tema(fonte):
     return {
         "defaults": {"font": letra(14)},
         "label": {"font": letra(14), "misc": {"text_horiz_alignment": "left"},
-                  "colours": {"normal_text": "#282828", "dark_bg": "#00000000"}},
+                  "colours": {"normal_text": "#EBEBEB", "dark_bg": "#00000000"}},
         "button": {"font": letra(14)},
         # Campos numéricos com contraste alto: número branco em fundo preto.
         "text_entry_line": {"font": letra(14), "colours": {
             "dark_bg": "#000000", "normal_text": "#FFFFFF", "text_cursor": "#FFFFFF",
             "selected_bg": "#2166AC", "selected_text": "#FFFFFF",
-            "normal_border": "#5A5A5A", "disabled_dark_bg": "#3A3A3A",
+            "normal_border": "#9A9A9A", "disabled_dark_bg": "#3A3A3A",
             "disabled_text": "#9A9A9A"}},
         "drop_down_menu": {"font": letra(14)},
         "#titulo": {"font": letra(22, True)},
-        "#secao": {"font": letra(14, True), "colours": {"normal_text": "#2166AC"}},
-        "#erro": {"colours": {"normal_text": "#D73027"}},
-        "#aviso": {"colours": {"normal_text": "#E66101"}},
+        "#secao": {"font": letra(14, True), "colours": {"normal_text": "#6BAED6"}},
+        "#erro": {"colours": {"normal_text": "#FF6B5E"}},
+        "#aviso": {"colours": {"normal_text": "#FDAE61"}},
         "#previa": {"font": letra(16, True)},
     }
 
@@ -121,7 +121,7 @@ class App:
         self.manager.draw_ui(self.janela)
         if self.erro:
             texto(self.janela, self.erro, (self.tamanho[0] // 2, self.tamanho[1] - 12), 14,
-                  cor=(215, 48, 39))
+                  cor=(255, 107, 94))
         pygame.display.flip()
 
     def rodar(self):

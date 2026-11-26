@@ -8,7 +8,8 @@ números vêm do gravador/da rede. Visão "ativação" (forward) ou "gradiente"
 import pygame
 
 from interface.layout_rede import (
-    BRANCO,
+    AZUL,
+    LARANJA,
     calcular_layout,
     cor_ativacao,
     cor_entrada,
@@ -19,8 +20,9 @@ from interface.layout_rede import (
     maior_peso,
 )
 
-COR_TEXTO = (40, 40, 40)
-COR_CONTORNO = (90, 90, 90)
+COR_TEXTO = (235, 235, 235)
+COR_CONTORNO = (170, 170, 170)
+COR_FUNDO_REDE = (12, 12, 12)
 
 
 def fonte(tamanho, negrito=False):
@@ -72,9 +74,12 @@ def desenhar_rede(superficie, area, rede, pesos, ativacoes=None, deltas=None, vi
                 cor = cor_peso(w)
                 if visao == "gradiente" and (camada, n) in deltas:
                     gradiente = deltas[(camada, n)] * ativacoes.get((camada - 1, j), 0.0)
-                    cor = cor_gradiente(gradiente, maior_gradiente)
+                    # No fundo escuro, gradiente zero = ligação apagada (não branca).
+                    destino = AZUL if gradiente >= 0 else LARANJA
+                    forca = abs(gradiente) / maior_gradiente if maior_gradiente else 0.0
+                    cor = interpolar((55, 55, 55), destino, forca)
                 if largura < 1:
-                    cor = interpolar(BRANCO, cor, largura)   # linha fina = cor mais clara
+                    cor = interpolar(COR_FUNDO_REDE, cor, max(largura, 0.4))   # linha fina = mais apagada
                 pygame.draw.line(superficie, cor, layout.posicoes[(camada - 1, j)],
                                  layout.posicoes[(camada, n)], max(1, round(largura)))
 
