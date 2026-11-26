@@ -1,0 +1,77 @@
+Roteiro de vídeo — MLP Studio
+Duração sugerida: 7 minutos, com cerca de 1min45s por integrante.
+Demonstração: treinamento de uma rede neural para aprender a tabela XOR.
+
+As instruções em Na tela indicam o que mostrar durante a gravação.
+
+Integrante	Tempo	Parte
+1	0:00–1:45	Apresentação e arquitetura da rede
+2	1:45–3:30	Carregamento e preparação dos dados
+3	3:30–5:15	Treinamento e backpropagation
+4	5:15–7:00	Avaliação, previsões e encerramento
+Integrante 1 · Apresentação e arquitetura · 0:00–1:45
+Na tela
+
+Mostre a página inicial do MLP Studio.
+Abra Arquitetura Neural e configure 2 entradas → 4 neurônios com Tanh → 1 saída com Sigmoid.
+Use seed 42. Mostre a prévia e clique em Criar rede.
+No editor, destaque a função forward em src/mlp/neuronio.py, linha 34.
+Fala
+
+OP, professor. Nosso projeto é o MLP Studio, uma aplicação em Python para criar, treinar e avaliar redes neurais do tipo perceptron multicamadas, também conhecido como MLP. A interface foi feita com Streamlit, e nós implementamos os cálculos da rede usando NumPy.
+
+Para demonstrar, vamos usar o XOR. Ele recebe dois valores binários e deve retornar um quando eles são diferentes e zero quando são iguais. Como esses casos não podem ser separados por uma única reta, usamos uma camada oculta com uma função de ativação não linear.
+
+Aqui na interface, configuramos duas entradas, quatro neurônios com ativação Tanh na camada oculta e uma saída com Sigmoid. A Sigmoid produz um valor entre zero e um, que vamos interpretar no fim do vídeo. A prévia mostra a arquitetura enquanto configuramos a rede, e o botão Criar rede aplica a configuração.
+
+No código do neurônio, o forward multiplica cada entrada pelo peso correspondente, soma os resultados e adiciona o bias. Depois, aplica a função de ativação. A saída de uma camada serve de entrada para a próxima. Com a rede criada, vamos preparar os exemplos que ela vai receber.
+
+Bernardo · Preparação dos dados · 1:45–3:30
+Na tela
+
+Abra Dataset, envie data/xor.csv e clique em Carregar CSV.
+Em Configurar dados, selecione x1 e x2 como entradas e y como saída.
+Use 70% treino, 15% validação, 15% teste, seed 42 e sem normalização. Clique em Validar e preparar conjuntos.
+Destaque split_dataset em src/mlp/dados.py, linha 65. Volte à aba Conjuntos preparados e mostre as quantidades.
+Fala
+
+Nosso CSV tem três colunas. x1 e x2 são os valores que entram na rede, e y é a resposta esperada. Por exemplo, quando as entradas são zero e um, a saída esperada é um.
+
+Depois de carregar o arquivo, selecionamos quais colunas são entradas e qual é a saída. Como os valores de entrada já são zero ou um, deixamos a normalização desativada neste exemplo.
+
+Aqui no código, a função split_dataset embaralha os índices das linhas. Usar os mesmos índices para selecionar as entradas e as saídas mantém cada exemplo ligado à sua resposta. Com a divisão de 70, 15 e 15 por cento, o arquivo de 20 linhas fica com 14 exemplos de treino, três de validação e três de teste.
+
+Cada conjunto tem um papel. O treino fornece os exemplos que atualizam os pesos. A validação mede o erro ao longo das épocas. O teste fica reservado para a avaliação final. Usamos a seed 42 para repetir a mesma divisão durante a demonstração. Com os três conjuntos preparados, podemos iniciar o treinamento.
+
+Integrante 3 · Treinamento e backpropagation · 3:30–5:15
+Na tela
+
+Abra Treinamento e configure 1.000 épocas, taxa de aprendizado 0,3 e seed 42.
+Clique em Iniciar treinamento.
+Mostre train_step em src/mlp/rede.py, linha 91, e o laço das épocas em src/mlp/treinamento.py, a partir da linha 24.
+Volte ao gráfico e aponte o começo e o fim das curvas.
+Fala
+
+Para treinar a rede, configuramos mil épocas e uma taxa de aprendizado de zero vírgula três. Uma época é uma passagem por todos os exemplos de treino. A taxa de aprendizado controla o tamanho de cada ajuste nos parâmetros.
+
+A função train_step mostra o que acontece com um exemplo. Primeiro, a rede faz o forward e produz uma previsão. A partir da diferença entre o valor previsto e o esperado, o backpropagation calcula o delta da camada de saída e propaga esse cálculo para a camada oculta. O delta ajuda a determinar quanto cada peso e cada bias contribui para a mudança do erro.
+
+O código calcula todos os deltas antes de atualizar os parâmetros. Em seguida, aplica a descida do gradiente estocástica, que ajusta os pesos e os biases após cada exemplo.
+
+Ao fim de cada época, a aplicação calcula o erro quadrático médio, ou MSE, no treino e na validação. O gráfico mostra como esse erro evoluiu. Nesta execução, o erro de treino caiu de aproximadamente 0,266 para 0,000174. O erro de validação também caiu. Agora vamos abrir o conjunto de teste e conferir as previsões.
+
+Integrante 4 · Avaliação, previsões e encerramento · 5:15–7:00
+Na tela
+
+Abra Avaliação, clique em Avaliar conjunto de teste e mostre o MSE e a tabela de valores esperados e previstos.
+Em Modelos e Previsões → Previsão manual, teste (0, 1) e (1, 1).
+Se houver tempo, mostre o botão para baixar o modelo como JSON.
+Fala
+
+Agora avaliamos os três registros reservados para teste. A tabela compara a saída esperada com a previsão da rede, e o erro quadrático médio ficou em aproximadamente 0,000336 nesta execução.
+
+Vamos testar dois pares manualmente. Com zero e um, a saída fica perto de 0,978. Como está acima de 0,5, interpretamos como classe um. Agora, com um e um, a saída fica perto de 0,013, abaixo de 0,5, então interpretamos como classe zero. O programa exibe o valor contínuo da Sigmoid, e usamos esse limiar para ler o resultado como uma classe.
+
+O arquivo repete os quatro padrões do XOR. Por isso, um mesmo par pode aparecer no treino e no teste. O resultado mostra que a rede aprendeu a tabela do XOR. Para medir generalização, precisaríamos de um exemplo com entradas inéditas no teste.
+
+A aplicação também permite baixar a rede treinada em JSON e carregá-la depois para fazer previsões. Assim, mostramos o fluxo completo no MLP Studio, da configuração da arquitetura e da preparação dos dados até o treinamento, a avaliação e o uso do modelo.

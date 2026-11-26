@@ -28,15 +28,23 @@ class TesteHubERede(unittest.TestCase):
         import pygame_gui
         from interface.app import App
         from interface.tela_hub import TelaHub
-        from interface.tela_rede import TelaRede
+        from interface.tela_player import TelaPlayer
         self.pygame, self.pygame_gui = pygame, pygame_gui
-        self.TelaHub, self.TelaRede = TelaHub, TelaRede
+        self.TelaHub, self.TelaPlayer = TelaHub, TelaPlayer
         self.app = App((1280, 720))
         self.addCleanup(pygame.quit)
 
     def quadros(self, n=3):
         for _ in range(n):
             self.app.passo()
+
+    def esperar_player(self):
+        """Roda quadros até a gravação (thread) terminar e o player abrir."""
+        import time
+        limite = time.time() + 60
+        while not isinstance(self.app.tela, self.TelaPlayer) and time.time() < limite:
+            self.app.passo()
+        self.quadros()
 
     def clicar(self, botao):
         """Simula o evento que o pygame_gui gera ao clicar no botão."""
@@ -60,10 +68,17 @@ class TesteHubERede(unittest.TestCase):
         self.assertEqual(hub.rotulo_base.text, "150 amostras · 4 entradas · 3 classes")
         self.assertTrue(hub.botao_gerar.is_enabled)
 
+        hub.form.epocas = "5"
+        hub.form.epocas_detalhadas = "1, fim"
+        hub.validar()
         self.clicar(hub.botao_gerar)
-        self.quadros()
+        self.esperar_player()
         tela = self.app.tela
-        self.assertIsInstance(tela, self.TelaRede)
+        self.assertIsInstance(tela, self.TelaPlayer)
+        for tecla in ("right", "right", "space", "end", "left"):
+            self.pygame.event.post(self.pygame.event.Event(
+                self.pygame.KEYDOWN, {"key": self.pygame.key.key_code(tecla), "mod": 0}))
+            self.quadros(1)
         rede = tela.experimento.rede
         self.assertEqual([c.W.shape for c in rede.camadas], [(5, 4), (3, 5)])
         self.assertEqual(len(tela.layout.posicoes), 4 + 5 + 3)
@@ -73,10 +88,12 @@ class TesteHubERede(unittest.TestCase):
         hub = self.app.tela
         hub.escolher_base(IRIS)
         hub.form.semente = "7"
+        hub.form.epocas = "3"
+        hub.form.epocas_detalhadas = "1, fim"
         hub.validar()
         hub.gerar()
-        self.quadros()
-        self.clicar(self.app.tela.botao_hub)
+        self.esperar_player()
+        self.app.tela.voltar()
         novo = self.app.tela
         self.assertIsInstance(novo, self.TelaHub)
         self.assertEqual(novo.form.semente, "7")
@@ -113,12 +130,16 @@ class TesteHubERede(unittest.TestCase):
     def test_redimensionar_nao_quebra(self):
         hub = self.app.tela
         hub.escolher_base(IRIS)
+        hub.form.epocas = "3"
+        hub.form.epocas_detalhadas = "1, fim"
+        hub.validar()
         hub.gerar()
+        self.esperar_player()
         self.pygame.event.post(self.pygame.event.Event(self.pygame.VIDEORESIZE, {"w": 1600, "h": 900}))
         self.quadros()
         self.assertEqual(self.app.tamanho, (1600, 900))
         maior_x = max(x for x, _ in self.app.tela.layout.posicoes.values())
-        self.assertGreater(maior_x, 1100)
+        self.assertGreater(maior_x, 900)   # painel lateral ocupa a direita
         self.assertIsNone(self.app.erro)
 
 

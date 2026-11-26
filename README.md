@@ -41,9 +41,12 @@ novo.
 ### Interface gráfica (em construção)
 
 Com dois cliques em `executar_interface.bat`, ou `python interface_grafica.py`.
-Por enquanto o hub monta a rede (base, camadas, ativações, divisão,
-normalização) e mostra a rede com os pesos iniciais; o player passo a passo
-está sendo construído (ver `PLANO_INTERFACE.md`).
+O hub monta a rede (base, camadas, ativações, divisão, normalização) e
+"Gerar" treina gravando os passos. O player toca o treino passo a passo:
+espaço tocar/pausar, ←/→ passo, Shift+←/→ neurônio, Home/End fase (com Ctrl,
+exemplo; com Ctrl+Shift, época), −/+ velocidade, V visão; clique ou arraste
+na barra de tempo para pular. Salvar/carregar e prever entrada ainda virão
+(ver `PLANO_INTERFACE.md`).
 
 Respondendo `n` em "Quer criar uma rede neural?", o programa oferece
 **carregar uma rede salva** (`.json`) para fazer previsões.
@@ -314,7 +317,8 @@ RedesNeuraisApp/
 │   ├── app.py           # janela, telas e eventos
 │   ├── tela_hub.py      # hub: escolher a base e montar a rede
 │   ├── config_hub.py    # validação do formulário do hub
-│   ├── tela_rede.py     # rede desenhada (vira o player)
+│   ├── tela_gravando.py # barra de progresso enquanto grava o treino
+│   ├── tela_player.py   # player passo a passo
 │   ├── desenho_rede.py  # desenha a rede com pygame
 │   ├── passos.py        # Passo da animação e estado_em()
 │   ├── formulas.py      # textos das fórmulas com números

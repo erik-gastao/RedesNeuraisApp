@@ -188,7 +188,7 @@ class TelaHub:
         # Prévia e ações.
         self.rotulo_previa = self._rotulo(x_rotulo, y, 900, "", "#previa")
         y += ALTURA_LINHA
-        self.botao_gerar = self._botao(x_rotulo, y, 220, "Gerar e abrir a rede", self.gerar)
+        self.botao_gerar = self._botao(x_rotulo, y, 220, "Gerar e abrir o player", self.gerar)
         self.botao_carregar = self._botao(x_rotulo + 235, y, 180, "Carregar rede…", lambda: None)
         self.botao_carregar.disable()   # etapa 9 do plano
         self.rotulo_status = self._rotulo(x_rotulo + 430, y, 700, "", "#erro")
@@ -281,7 +281,7 @@ class TelaHub:
             self.botao_gerar.enable()
 
     def gerar(self):
-        """Monta o experimento e abre a rede (na etapa 5: grava e abre o player)."""
+        """Monta o experimento, grava o treino (com barra de progresso) e abre o player."""
         if self.parametros is None:
             return
         p = self.parametros
@@ -294,11 +294,11 @@ class TelaHub:
         except (OSError, ValueError) as erro:
             self.rotulo_status.set_text(f"Não foi possível montar a rede: {erro}")
             return
-        from interface.tela_rede import TelaRede
+        from interface.tela_gravando import TelaGravando
         self.app.ultimo_formulario = self.form
         self.app.ultima_descricao = self.descricao
         self.app.ultima_previa = previa(self.form, self.descricao)
-        self.app.trocar_tela(TelaRede(self.app, experimento, p))
+        self.app.trocar_tela(TelaGravando(self.app, experimento, p))
 
     # ------------------------------------------------------------- eventos
 
