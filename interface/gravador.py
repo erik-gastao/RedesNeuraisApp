@@ -317,7 +317,7 @@ def _passo_compacto(rede, x, y, epoca, exemplo, indice):
     y_hat = np.array([n.a for n in rede.camadas[-1].neuronios])
     erro = mse(y.reshape(1, -1), y_hat.reshape(1, -1))
     return _passo(
-        epoca, exemplo, "exemplo", "exemplo_compacto", None, None, None,
+        epoca, exemplo, "exemplo", "exemplo_compacto", len(rede.camadas), None, None,
         {"indice": indice, "x": np.asarray(x, dtype=float).tolist(), "y": y.tolist(),
          "y_hat": y_hat.tolist(), "erro": erro},
         formulas.formula_compacto(y, y_hat, erro),

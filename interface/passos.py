@@ -59,6 +59,10 @@ def estado_em(passos, i):
             ativacoes[(passo.camada, passo.neuronio)] = v["a"]
         elif passo.tipo == "camada_forward":
             ativacoes.update({(passo.camada, n): a for n, a in enumerate(v["a"])})
+        elif passo.tipo == "exemplo_compacto":
+            # Exemplo fora de foco: mostra a entrada e a saída dele.
+            ativacoes.update({(0, j): x for j, x in enumerate(v["x"])})
+            ativacoes.update({(passo.camada, n): a for n, a in enumerate(v["y_hat"])})
         elif passo.tipo == "delta":
             deltas[(passo.camada, passo.neuronio)] = v["delta"]
         elif passo.tipo == "camada_delta":

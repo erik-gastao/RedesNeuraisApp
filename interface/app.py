@@ -4,6 +4,8 @@ A janela nunca fecha com erro: uma exceção inesperada vira uma mensagem em
 vermelho no rodapé (e o detalhe vai para o terminal).
 """
 
+import ctypes
+import sys
 import traceback
 
 import pygame
@@ -44,8 +46,23 @@ def tema(fonte):
     }
 
 
+def _nitidez_no_windows():
+    """Avisa o Windows que a janela lida com DPI, para ele não esticar (e borrar)
+    a imagem quando a escala da tela é 125%, 150%..."""
+    if sys.platform != "win32":
+        return
+    try:
+        ctypes.windll.shcore.SetProcessDpiAwareness(1)
+    except (AttributeError, OSError):
+        try:
+            ctypes.windll.user32.SetProcessDPIAware()
+        except (AttributeError, OSError):
+            pass
+
+
 class App:
     def __init__(self, tamanho=TAMANHO_INICIAL):
+        _nitidez_no_windows()
         pygame.init()
         pygame.display.set_caption(TITULO)
         self.tamanho = tamanho

@@ -98,10 +98,7 @@ def desenhar_rede(superficie, area, rede, pesos, ativacoes=None, deltas=None, vi
             else:
                 preenchimento = cor_ativacao(a, nomes[camada], maior_camada)
             pygame.draw.circle(superficie, preenchimento, posicao, layout.raio)
-            contorno = COR_CONTORNO
-            if camada > 0 and rede.usar_bias:
-                contorno = cor_peso(pesos[camada - 1][1][n])
-            pygame.draw.circle(superficie, contorno, posicao, layout.raio, 2)
+            pygame.draw.circle(superficie, COR_CONTORNO, posicao, layout.raio, 2)
 
     _desenhar_rotulos(superficie, layout, tamanhos, nomes, rotulos_entrada, rotulos_saida)
     return layout
